@@ -36,14 +36,22 @@ export function SignupForm() {
 
     setIsLoading(true)
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    try {
+      // Dynamic import to avoid top-level dependency issues until installed
+      const { api } = await import("@/lib/api");
 
-    // In a real app, you would handle registration here
-    console.log("[v0] Signup attempt:", formData)
+      await api.signup("user", {
+        email: formData.email,
+        password: formData.password,
+        name: formData.name,
+      });
 
-    setIsLoading(false)
-    router.push("/profile")
+      setIsLoading(false);
+      router.push("/login");
+    } catch (error: any) {
+      setIsLoading(false);
+      alert(error.message || "Signup failed");
+    }
   }
 
   return (
