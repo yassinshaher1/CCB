@@ -7,7 +7,7 @@ from firebase_admin import credentials, db
 
 # --- CONFIGURATION ---
 # We use the key file you provided
-CRED_PATH = "serviceAccountKey.json"
+CRED_PATH = "../shared-assets/serviceAccountKey.json"
 # Based on your project ID 'ccb-db-41f73', this is the standard URL format.
 # If this fails, check Firebase Console -> Realtime Database -> Data tab for the correct URL.
 DATABASE_URL = "https://ccb-db-41f73-default-rtdb.firebaseio.com/"
