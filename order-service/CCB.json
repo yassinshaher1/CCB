@@ -1,0 +1,130 @@
+{
+  "users": {
+    "{userId}": {
+      "auth": {
+        "email": "",
+        "password": "",
+        "lastLoginAt": "",
+        "createdAt": ""
+      },
+
+      "profile": {
+        "name": "",
+        "phone": "",
+        "role": "user",
+        "status": "active"
+      },
+
+      "cart": {
+        "{productId}": {
+          "productId": "",
+          "quantity": 0,
+          "price": 0
+        }
+      },
+
+      "wishlist": {
+        "{productId}": true
+      }
+    }
+  },
+
+  "admins": {
+    "{adminId}": {
+      "auth": {
+        "email": "",
+        "password": "",
+        "lastLoginAt": "",
+        "createdAt": ""
+      },
+
+      "profile": {
+        "name": "",
+        "role": "admin",
+        "status": "active"
+      },
+
+      "permissions": {
+        "catalogueService": true,
+        "orderService": true,
+        "paymentService": true,
+        "userManagementService": true
+      }
+    }
+  },
+
+  "products": {
+    "{productId}": {
+      "name": "",
+      "categoryId": "",
+      "price": 0,
+      "stock": 0,
+      "description": "",
+      "images": {
+        "{imageId}": ""
+      },
+      "isActive": true,
+      "createdAt": "",
+      "updatedAt": ""
+    }
+  },
+
+  "categories": {
+    "{categoryId}": {
+      "name": "",
+      "description": "",
+      "createdAt": ""
+    }
+  },
+
+  "orders": {
+    "{orderId}": {
+      "userId": "",
+      "status": "",
+      "totalPrice": 0,
+      "createdAt": "",
+      "updatedAt": "",
+      "items": {
+        "{productId}": {
+          "quantity": 0,
+          "price": 0
+        }
+      },
+      "paymentId": ""
+    }
+  },
+
+  "payments": {
+    "{paymentId}": {
+      "orderId": "",
+      "method": "",
+      "status": "",
+      "amount": 0,
+      "currency": "",
+      "createdAt": ""
+    }
+  },
+
+  "system": {
+    "services": {
+      "authService": {
+        "enabled": true
+      },
+      "catalogueService": {
+        "enabled": true
+      },
+      "cartService": {
+        "enabled": true
+      },
+      "wishlistService": {
+        "enabled": true
+      },
+      "orderService": {
+        "enabled": true
+      },
+      "paymentService": {
+        "enabled": true
+      }
+    }
+  }
+}
