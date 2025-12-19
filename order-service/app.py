@@ -2,8 +2,16 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import json
 from kafka import KafkaProducer # REQUIRED for Member 3 [cite: 103]
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # In production, you'd put your frontend URL here
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # 1. KAFKA SETUP [cite: 103]
 # The 'bootstrap_servers' will be provided by your Lead on Day 3
