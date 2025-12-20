@@ -35,7 +35,7 @@ class Product(BaseModel):
     description: Optional[str] = None
     stock: int = 0
     categoryId: str = "general"
-    imageUrl: Optional[str] = ""  # <--- NEW FIELD
+    imageUrl: Optional[str] = ""  # This is the field we added
 
 # --- ROUTES ---
 
@@ -62,7 +62,6 @@ def add_product(product: Product):
     new_product_ref = ref.push(product.dict())
     return {"message": "Added", "id": new_product_ref.key}
 
-# --- NEW: DELETE ENDPOINT ---
 @app.delete("/products/{product_id}")
 def delete_product(product_id: str):
     """Delete a product by ID"""
@@ -73,7 +72,6 @@ def delete_product(product_id: str):
     ref.delete()
     return {"message": "Product deleted successfully"}
 
-# --- NEW: UPDATE ENDPOINT ---
 @app.put("/products/{product_id}")
 def update_product(product_id: str, product: Product):
     """Update a product by ID"""
