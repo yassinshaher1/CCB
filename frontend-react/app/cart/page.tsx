@@ -14,19 +14,7 @@ export default function CartPage() {
   const cartItems = cart
 
   // Inside your Cart or Checkout component
-const handlePlaceOrder = async () => {
-  const response = await fetch('http://127.0.0.1:8000/order', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      userId: "user_123", 
-      cartItems: [{ id: 1, name: "Product Name", quantity: 1 }]
-    }),
-  });
 
-  const data = await response.json();
-  alert(data.message); // Should alert: "Order received! Processing..."
-};
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const shipping = subtotal > 100 ? 0 : 15
   const tax = subtotal * 0.0635
@@ -125,9 +113,7 @@ const handlePlaceOrder = async () => {
                 <Button asChild className="w-full mb-3" size="lg">
                   <Link href="/checkout">Proceed to Checkout</Link>
                 </Button>
-                <Button onClick={handlePlaceOrder} className="w-full mb-3" size="lg">
-                  Place Order
-                </Button>
+
               </Card>
             </div>
           </div>
