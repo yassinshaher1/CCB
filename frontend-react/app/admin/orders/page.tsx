@@ -7,7 +7,7 @@ import { AdminLayout } from "@/components/admin/admin-layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
-import { Search, Eye, Download, Filter } from "lucide-react"
+import { Search, Eye, Download, Filter, RotateCcw, CheckCircle, XCircle } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -17,7 +17,7 @@ interface Order {
   customerEmail: string
   items: Array<{ name: string; quantity: number; price: number }>
   total: number
-  status: "Pending" | "Processing" | "Shipped" | "Completed" | "Cancelled"
+  status: "Pending" | "Processing" | "Shipped" | "Completed" | "Cancelled" | "Refund Requested" | "Refunded"
   date: string
   shippingAddress: string
 }
@@ -82,6 +82,10 @@ export default function OrdersPage() {
         return "bg-orange-100 text-orange-800"
       case "Cancelled":
         return "bg-red-100 text-red-800"
+      case "Refund Requested":
+        return "bg-yellow-100 text-yellow-800"
+      case "Refunded":
+        return "bg-emerald-100 text-emerald-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
@@ -127,6 +131,8 @@ export default function OrdersPage() {
               <SelectItem value="Shipped">Shipped</SelectItem>
               <SelectItem value="Completed">Completed</SelectItem>
               <SelectItem value="Cancelled">Cancelled</SelectItem>
+              <SelectItem value="Refund Requested">Refund Requested</SelectItem>
+              <SelectItem value="Refunded">Refunded</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -179,6 +185,8 @@ export default function OrdersPage() {
                               <SelectItem value="Shipped">Shipped</SelectItem>
                               <SelectItem value="Completed">Completed</SelectItem>
                               <SelectItem value="Cancelled">Cancelled</SelectItem>
+                              <SelectItem value="Refund Requested">Refund Requested</SelectItem>
+                              <SelectItem value="Refunded">Refunded</SelectItem>
                             </SelectContent>
                           </Select>
                         </td>
@@ -262,6 +270,50 @@ export default function OrdersPage() {
                   <span className="text-primary">${selectedOrder.total.toFixed(2)}</span>
                 </div>
               </div>
+
+              {/* Refund Actions */}
+              {selectedOrder.status === "Refund Requested" && (
+                <div className="border-t pt-4 space-y-3">
+                  <p className="text-sm font-medium text-yellow-700 bg-yellow-50 p-3 rounded-md flex items-center gap-2">
+                    <RotateCcw className="h-4 w-4" />
+                    Customer has requested a refund for this order
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1 bg-green-600 hover:bg-green-700"
+                      onClick={() => {
+                        handleStatusChange(selectedOrder.id, "Refunded")
+                        setSelectedOrder({ ...selectedOrder, status: "Refunded" })
+                        alert("Refund approved! Customer will be notified.")
+                      }}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Approve Refund
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="flex-1"
+                      onClick={() => {
+                        handleStatusChange(selectedOrder.id, "Completed")
+                        setSelectedOrder({ ...selectedOrder, status: "Completed" })
+                        alert("Refund denied. Order status set to Completed.")
+                      }}
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Deny Refund
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {selectedOrder.status === "Refunded" && (
+                <div className="border-t pt-4">
+                  <p className="text-sm font-medium text-emerald-700 bg-emerald-50 p-3 rounded-md flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    This order has been refunded
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>

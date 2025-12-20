@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Package, Settings, MapPin, CreditCard, Bell, Shield, LogOut, X } from "lucide-react"
+import { Package, Settings, MapPin, CreditCard, Bell, Shield, LogOut, X, RotateCcw } from "lucide-react"
 import { Header } from "@/components/header"
 
 interface OrderItem {
@@ -403,6 +403,47 @@ export default function ProfilePage() {
                     <p className="text-sm text-muted-foreground">{selectedOrder.shippingAddress}</p>
                   </div>
                 </>
+              )}
+
+              <Separator />
+
+              {/* Refund Button */}
+              {selectedOrder.status !== "Refunded" && selectedOrder.status !== "Refund Requested" ? (
+                <Button
+                  variant="outline"
+                  className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => {
+                    // Update order status in localStorage
+                    const allOrders = JSON.parse(localStorage.getItem("ccb-admin-orders") || "[]")
+                    const updatedOrders = allOrders.map((order: Order) =>
+                      order.id === selectedOrder.id
+                        ? { ...order, status: "Refund Requested" }
+                        : order
+                    )
+                    localStorage.setItem("ccb-admin-orders", JSON.stringify(updatedOrders))
+
+                    // Update local state
+                    setOrders(orders.map(order =>
+                      order.id === selectedOrder.id
+                        ? { ...order, status: "Refund Requested" }
+                        : order
+                    ))
+                    setSelectedOrder({ ...selectedOrder, status: "Refund Requested" })
+
+                    alert("Refund request submitted! Our team will review your request within 2-3 business days.")
+                  }}
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Request Refund
+                </Button>
+              ) : (
+                <div className="text-center p-3 bg-muted rounded-md">
+                  <p className="text-sm text-muted-foreground">
+                    {selectedOrder.status === "Refund Requested"
+                      ? "⏳ Refund request is being processed"
+                      : "✅ This order has been refunded"}
+                  </p>
+                </div>
               )}
             </div>
           )}
