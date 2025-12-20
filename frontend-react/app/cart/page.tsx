@@ -13,6 +13,8 @@ export default function CartPage() {
   const { cart, removeFromCart, updateQuantity } = useStore()
   const cartItems = cart
 
+  // Inside your Cart or Checkout component
+
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const shipping = subtotal > 100 ? 0 : 15
   const tax = subtotal * 0.0635
@@ -111,9 +113,7 @@ export default function CartPage() {
                 <Button asChild className="w-full mb-3" size="lg">
                   <Link href="/checkout">Proceed to Checkout</Link>
                 </Button>
-                <Button asChild variant="outline" className="w-full bg-transparent">
-                  <Link href="/shop">Continue Shopping</Link>
-                </Button>
+
               </Card>
             </div>
           </div>
