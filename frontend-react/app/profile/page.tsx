@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { useStore } from "@/lib/store-context"
@@ -12,6 +12,16 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Package, Settings, MapPin, CreditCard, Bell, Shield, LogOut } from "lucide-react"
 import { Header } from "@/components/header"
+
+interface Order {
+  id: string
+  orderNumber: number
+  customerEmail: string
+  total: number
+  status: string
+  date: string
+  items: Array<{ name: string; quantity: number; price: number }>
+}
 
 function getInitials(name: string): string {
   return name
@@ -26,6 +36,19 @@ export default function ProfilePage() {
   const { user, isAuthenticated, logout } = useAuth()
   const { wishlist } = useStore()
   const router = useRouter()
+  const [orders, setOrders] = useState<Order[]>([])
+
+  // Load orders from localStorage
+  useEffect(() => {
+    if (user) {
+      const allOrders = JSON.parse(localStorage.getItem("ccb-admin-orders") || "[]")
+      // Filter orders for current user
+      const userOrders = allOrders.filter(
+        (order: Order) => order.customerEmail === user.email
+      )
+      setOrders(userOrders)
+    }
+  }, [user])
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -38,6 +61,8 @@ export default function ProfilePage() {
   if (!isAuthenticated || !user) {
     return null
   }
+
+  const totalSpent = orders.reduce((sum, order) => sum + order.total, 0)
 
   return (
     <div className="min-h-screen bg-background">
@@ -85,10 +110,12 @@ export default function ProfilePage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardDescription>Total Orders</CardDescription>
-                <CardTitle className="text-3xl">0</CardTitle>
+                <CardTitle className="text-3xl">{orders.length}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-xs text-muted-foreground">Start shopping to see your orders</p>
+                <p className="text-xs text-muted-foreground">
+                  {orders.length > 0 ? "View your order history" : "Start shopping to see your orders"}
+                </p>
               </CardContent>
             </Card>
             <Card>
@@ -105,10 +132,10 @@ export default function ProfilePage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardDescription>Total Spent</CardDescription>
-                <CardTitle className="text-3xl">$0</CardTitle>
+                <CardTitle className="text-3xl">${totalSpent.toFixed(2)}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-xs text-muted-foreground">This year</p>
+                <p className="text-xs text-muted-foreground">All time</p>
               </CardContent>
             </Card>
           </div>
@@ -128,14 +155,36 @@ export default function ProfilePage() {
                   <CardDescription>Your order history and tracking information</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
-                    <Package className="h-12 w-12 mb-4" />
-                    <p className="font-medium">No orders yet</p>
-                    <p className="text-sm">When you place orders, they will appear here.</p>
-                    <Button className="mt-4" onClick={() => router.push("/shop")}>
-                      Start Shopping
-                    </Button>
-                  </div>
+                  {orders.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                      <Package className="h-12 w-12 mb-4" />
+                      <p className="font-medium">No orders yet</p>
+                      <p className="text-sm">When you place orders, they will appear here.</p>
+                      <Button className="mt-4" onClick={() => router.push("/shop")}>
+                        Start Shopping
+                      </Button>
+                    </div>
+                  ) : (
+                    orders.map((order) => (
+                      <div key={order.id} className="flex items-center gap-4 p-4 border rounded-lg">
+                        <Package className="h-10 w-10 text-muted-foreground" />
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center justify-between">
+                            <p className="font-medium">Order #{order.orderNumber}</p>
+                            <Badge variant={order.status === "Delivered" ? "default" : "secondary"}>
+                              {order.status}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {order.date} • ${order.total.toFixed(2)}
+                          </p>
+                        </div>
+                        <Button variant="outline" size="sm">
+                          View Details
+                        </Button>
+                      </div>
+                    ))
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
