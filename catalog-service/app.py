@@ -1,15 +1,13 @@
 import json
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import firebase_admin
 from firebase_admin import credentials, db
 
 # --- CONFIGURATION ---
-# We use the key file you provided
 CRED_PATH = "serviceAccountKey.json"
-# Based on your project ID 'ccb-db-41f73', this is the standard URL format.
-# If this fails, check Firebase Console -> Realtime Database -> Data tab for the correct URL.
 DATABASE_URL = "https://ccb-db-41f73-default-rtdb.firebaseio.com/"
 
 # --- FIREBASE SETUP ---
@@ -21,6 +19,15 @@ if not firebase_admin._apps:
 
 app = FastAPI()
 
+# --- CORS ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # --- MODELS ---
 class Product(BaseModel):
     name: str
@@ -28,35 +35,51 @@ class Product(BaseModel):
     description: Optional[str] = None
     stock: int = 0
     categoryId: str = "general"
+    imageUrl: Optional[str] = ""  # <--- NEW FIELD
 
 # --- ROUTES ---
 
 @app.get("/products")
 def get_products():
-    """Fetch all products from Firebase"""
+    """Fetch all products"""
     ref = db.reference('products')
     data = ref.get()
     
     if not data:
         return []
     
-
     product_list = []
     for key, value in data.items():
-        value['id'] = key # Add the Firebase ID to the object
+        value['id'] = key
         product_list.append(value)
         
     return product_list
 
 @app.post("/products")
 def add_product(product: Product):
-    """Save a new product to Firebase"""
+    """Add a new product"""
     ref = db.reference('products')
-    
     new_product_ref = ref.push(product.dict())
+    return {"message": "Added", "id": new_product_ref.key}
+
+# --- NEW: DELETE ENDPOINT ---
+@app.delete("/products/{product_id}")
+def delete_product(product_id: str):
+    """Delete a product by ID"""
+    ref = db.reference(f'products/{product_id}')
+    if ref.get() is None:
+        raise HTTPException(status_code=404, detail="Product not found")
     
-    return {
-        "message": "Product added successfully", 
-        "id": new_product_ref.key,
-        "product": product
-    }
+    ref.delete()
+    return {"message": "Product deleted successfully"}
+
+# --- NEW: UPDATE ENDPOINT ---
+@app.put("/products/{product_id}")
+def update_product(product_id: str, product: Product):
+    """Update a product by ID"""
+    ref = db.reference(f'products/{product_id}')
+    if ref.get() is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    ref.update(product.dict())
+    return {"message": "Product updated successfully"}
