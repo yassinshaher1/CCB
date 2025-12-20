@@ -3,8 +3,9 @@
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 
+// --- UPDATED INTERFACES (Allow ID to be string or number to match backend) ---
 export interface Product {
-  id: number
+  id: number | string
   name: string
   price: number
   image: string
@@ -14,20 +15,20 @@ export interface Product {
 
 export interface CartItem extends Product {
   quantity: number
-  size: string
-  color: string
+  size?: string   // Made optional for simple products
+  color?: string  // Made optional for simple products
 }
 
 interface StoreContextType {
   cart: CartItem[]
   wishlist: Product[]
-  addToCart: (product: Product, size: string, color: string) => void
-  removeFromCart: (id: number) => void
-  updateQuantity: (id: number, change: number) => void
+  addToCart: (product: Product, size?: string, color?: string) => void
+  removeFromCart: (id: number | string) => void
+  updateQuantity: (id: number | string, change: number) => void
   addToWishlist: (product: Product) => void
-  removeFromWishlist: (id: number) => void
+  removeFromWishlist: (id: number | string) => void
   clearCart: () => void
-  isInWishlist: (id: number) => boolean
+  isInWishlist: (id: number | string) => boolean
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined)
@@ -54,25 +55,43 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("ccb-wishlist", JSON.stringify(wishlist))
   }, [wishlist])
 
-  const addToCart = (product: Product, size: string, color: string) => {
+  // --- UPDATED ADD TO CART ---
+  const addToCart = (product: Product, size: string = "Default", color: string = "Default") => {
     setCart((prev) => {
-      const existing = prev.find((item) => item.id === product.id && item.size === size && item.color === color)
+      // Check if exact item exists
+      const existing = prev.find((item) => item.id === product.id)
+      
       if (existing) {
+        // If exists, just increase quantity
         return prev.map((item) =>
-          item.id === product.id && item.size === size && item.color === color
+          item.id === product.id
             ? { ...item, quantity: item.quantity + 1 }
-            : item,
+            : item
         )
       }
+      // If new, add to cart
       return [...prev, { ...product, quantity: 1, size, color }]
     })
   }
 
-  const removeFromCart = (id: number) => {
-    setCart((prev) => prev.filter((item) => item.id !== id))
+  // --- FIXED REMOVE FUNCTION (The logic you wanted) ---
+  const removeFromCart = (id: number | string) => {
+    setCart((prev) => {
+      const existingItem = prev.find((item) => item.id === id);
+
+      // If quantity is more than 1, just decrease it
+      if (existingItem && existingItem.quantity > 1) {
+         return prev.map((item) =>
+          item.id === id ? { ...item, quantity: item.quantity - 1 } : item
+        );
+      }
+
+      // If quantity is 1, remove it completely
+      return prev.filter((item) => item.id !== id);
+    })
   }
 
-  const updateQuantity = (id: number, change: number) => {
+  const updateQuantity = (id: number | string, change: number) => {
     setCart((prev) =>
       prev.map((item) => (item.id === id ? { ...item, quantity: Math.max(1, item.quantity + change) } : item)),
     )
@@ -85,7 +104,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
-  const removeFromWishlist = (id: number) => {
+  const removeFromWishlist = (id: number | string) => {
     setWishlist((prev) => prev.filter((item) => item.id !== id))
   }
 
@@ -93,7 +112,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setCart([])
   }
 
-  const isInWishlist = (id: number) => {
+  const isInWishlist = (id: number | string) => {
     return wishlist.some((item) => item.id === id)
   }
 
