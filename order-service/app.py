@@ -6,7 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Add shared-assets to path specially because it has a hyphen
 shared_assets_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared-assets")
-sys.path.append(shared_assets_path)
+sys.path.insert(0, shared_assets_path)
+
+# noinspection PyUnresolvedReferences
 from firebase_config import get_db
 
 app = FastAPI()
