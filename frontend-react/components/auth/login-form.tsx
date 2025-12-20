@@ -57,6 +57,7 @@ export function LoginForm() {
             type="email"
             placeholder="you@example.com"
             required
+            suppressHydrationWarning
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
           />

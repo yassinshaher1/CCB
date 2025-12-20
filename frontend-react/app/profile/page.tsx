@@ -1,4 +1,9 @@
-import type { Metadata } from "next"
+"use client"
+
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/lib/auth-context"
+import { useStore } from "@/lib/store-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -8,12 +13,32 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Package, Settings, MapPin, CreditCard, Bell, Shield, LogOut } from "lucide-react"
 import { Header } from "@/components/header"
 
-export const metadata: Metadata = {
-  title: "Profile | CCB - Connecticut Clothing Brand",
-  description: "Manage your account and preferences",
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2)
 }
 
 export default function ProfilePage() {
+  const { user, isAuthenticated, logout } = useAuth()
+  const { wishlist } = useStore()
+  const router = useRouter()
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push("/login")
+    }
+  }, [isAuthenticated, router])
+
+  // Show nothing while checking auth or redirecting
+  if (!isAuthenticated || !user) {
+    return null
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -26,23 +51,31 @@ export default function ProfilePage() {
               <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
                 <Avatar className="h-24 w-24">
                   <AvatarImage src="/placeholder.svg?height=96&width=96" alt="Profile" />
-                  <AvatarFallback className="text-2xl">JD</AvatarFallback>
+                  <AvatarFallback className="text-2xl">{getInitials(user.name)}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center gap-3">
-                    <h1 className="text-3xl font-bold">John Doe</h1>
-                    <Badge variant="secondary">Premium Member</Badge>
+                    <h1 className="text-3xl font-bold">{user.name}</h1>
+                    <Badge variant="secondary">
+                      {user.isAdmin ? "Admin" : "Member"}
+                    </Badge>
                   </div>
-                  <p className="text-muted-foreground">john.doe@example.com</p>
+                  <p className="text-muted-foreground">{user.email}</p>
                   <p className="text-sm text-muted-foreground flex items-center gap-1">
                     <MapPin className="h-3 w-3" />
-                    Hartford, Connecticut
+                    Connecticut
                   </p>
                 </div>
-                <Button>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Edit Profile
-                </Button>
+                <div className="flex gap-2">
+                  <Button>
+                    <Settings className="h-4 w-4 mr-2" />
+                    Edit Profile
+                  </Button>
+                  <Button variant="outline" onClick={logout}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -52,25 +85,27 @@ export default function ProfilePage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardDescription>Total Orders</CardDescription>
-                <CardTitle className="text-3xl">47</CardTitle>
+                <CardTitle className="text-3xl">0</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-xs text-muted-foreground">+3 from last month</p>
+                <p className="text-xs text-muted-foreground">Start shopping to see your orders</p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-3">
                 <CardDescription>Wishlist Items</CardDescription>
-                <CardTitle className="text-3xl">12</CardTitle>
+                <CardTitle className="text-3xl">{wishlist.length}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-xs text-muted-foreground">4 items on sale</p>
+                <p className="text-xs text-muted-foreground">
+                  {wishlist.length > 0 ? "View your saved items" : "Save items you love"}
+                </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-3">
                 <CardDescription>Total Spent</CardDescription>
-                <CardTitle className="text-3xl">$2,847</CardTitle>
+                <CardTitle className="text-3xl">$0</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground">This year</p>
@@ -93,21 +128,14 @@ export default function ProfilePage() {
                   <CardDescription>Your order history and tracking information</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {[1, 2, 3].map((order) => (
-                    <div key={order} className="flex items-center gap-4 p-4 border rounded-lg">
-                      <Package className="h-10 w-10 text-muted-foreground" />
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <p className="font-medium">Order #{1000 + order}</p>
-                          <Badge>Delivered</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">Delivered on Dec {18 - order}, 2024</p>
-                      </div>
-                      <Button variant="outline" size="sm">
-                        View Details
-                      </Button>
-                    </div>
-                  ))}
+                  <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                    <Package className="h-12 w-12 mb-4" />
+                    <p className="font-medium">No orders yet</p>
+                    <p className="text-sm">When you place orders, they will appear here.</p>
+                    <Button className="mt-4" onClick={() => router.push("/shop")}>
+                      Start Shopping
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
