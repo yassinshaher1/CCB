@@ -12,7 +12,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null
-  login: (email: string, password: string) => Promise<boolean>
+  login: (email: string, password: string) => Promise<User | null>
   logout: () => void
   isAdmin: boolean
   isAuthenticated: boolean
@@ -45,35 +45,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user])
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    // Check if admin
-    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-      const adminUser = {
-        email: ADMIN_EMAIL,
-        name: "Admin",
-        isAdmin: true,
-      }
-      setUser(adminUser)
-      return true
-    }
+  const login = async (email: string, password: string): Promise<User | null> => {
+    try {
+      const { api } = await import("./api");
+      const data = await api.login({ email, password });
 
-    // Regular user login (simplified for demo)
-    if (email && password) {
-      const regularUser = {
+      const profile = await api.getProfile(data.access_token);
+
+      const authUser = {
         email,
-        name: email.split("@")[0],
-        isAdmin: false,
-      }
-      setUser(regularUser)
-      return true
-    }
+        name: profile.name,
+        isAdmin: data.role === "admin",
+      };
 
-    return false
+      setUser(authUser);
+      localStorage.setItem("ccb-token", data.access_token);
+      return authUser;
+    } catch (error) {
+      console.error("Login failed:", error);
+      return null;
+    }
   }
 
   const logout = () => {
     setUser(null)
     localStorage.removeItem("ccb-user")
+    localStorage.removeItem("ccb-token")
     router.push("/")
   }
 
