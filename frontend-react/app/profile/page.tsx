@@ -10,17 +10,33 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Package, Settings, MapPin, CreditCard, Bell, Shield, LogOut } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Package, Settings, MapPin, CreditCard, Bell, Shield, LogOut, X } from "lucide-react"
 import { Header } from "@/components/header"
+
+interface OrderItem {
+  name: string
+  quantity: number
+  price: number
+  size?: string
+  color?: string
+}
 
 interface Order {
   id: string
   orderNumber: number
   customerEmail: string
+  customerName: string
   total: number
+  subtotal: number
+  shipping: number
+  tax: number
   status: string
   date: string
-  items: Array<{ name: string; quantity: number; price: number }>
+  shippingAddress: string
+  items: OrderItem[]
 }
 
 function getInitials(name: string): string {
@@ -33,10 +49,20 @@ function getInitials(name: string): string {
 }
 
 export default function ProfilePage() {
-  const { user, isAuthenticated, logout } = useAuth()
+  const { user, isAuthenticated, logout, updateUser } = useAuth()
   const { wishlist } = useStore()
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
+  const [editForm, setEditForm] = useState({
+    name: "",
+    phone: "",
+    address: "",
+    city: "",
+    state: "CT",
+    zip: "",
+  })
 
   // Load orders from localStorage
   useEffect(() => {
@@ -47,6 +73,16 @@ export default function ProfilePage() {
         (order: Order) => order.customerEmail === user.email
       )
       setOrders(userOrders)
+
+      // Initialize edit form with user data
+      setEditForm({
+        name: user.name || "",
+        phone: user.phone || "",
+        address: user.address || "",
+        city: user.city || "",
+        state: user.state || "CT",
+        zip: user.zip || "",
+      })
     }
   }, [user])
 
@@ -63,6 +99,16 @@ export default function ProfilePage() {
   }
 
   const totalSpent = orders.reduce((sum, order) => sum + order.total, 0)
+
+  const handleSaveProfile = async () => {
+    const success = await updateUser(editForm)
+    if (success) {
+      alert("Profile updated successfully!")
+      setIsEditProfileOpen(false)
+    } else {
+      alert("Failed to update profile. Please try again.")
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -92,7 +138,7 @@ export default function ProfilePage() {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Button>
+                  <Button onClick={() => setIsEditProfileOpen(true)}>
                     <Settings className="h-4 w-4 mr-2" />
                     Edit Profile
                   </Button>
@@ -179,7 +225,7 @@ export default function ProfilePage() {
                             {order.date} • ${order.total.toFixed(2)}
                           </p>
                         </div>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)}>
                           View Details
                         </Button>
                       </div>
@@ -291,6 +337,165 @@ export default function ProfilePage() {
           </Tabs>
         </div>
       </main>
+
+      {/* Order Details Dialog */}
+      <Dialog open={selectedOrder !== null} onOpenChange={(open) => !open && setSelectedOrder(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Order #{selectedOrder?.orderNumber}</DialogTitle>
+            <DialogDescription>
+              Placed on {selectedOrder?.date}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedOrder && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Status</span>
+                <Badge variant={selectedOrder.status === "Delivered" ? "default" : "secondary"}>
+                  {selectedOrder.status}
+                </Badge>
+              </div>
+
+              <Separator />
+
+              <div>
+                <h4 className="font-medium mb-2">Items</h4>
+                <div className="space-y-2">
+                  {selectedOrder.items.map((item, index) => (
+                    <div key={index} className="flex justify-between text-sm">
+                      <span>
+                        {item.name} × {item.quantity}
+                        {item.size && <span className="text-muted-foreground"> ({item.size})</span>}
+                      </span>
+                      <span className="font-medium">${(item.price * item.quantity).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span>${(selectedOrder.subtotal || selectedOrder.total * 0.9).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Shipping</span>
+                  <span>{selectedOrder.shipping === 0 ? "Free" : `$${(selectedOrder.shipping || 0).toFixed(2)}`}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Tax</span>
+                  <span>${(selectedOrder.tax || selectedOrder.total * 0.0635).toFixed(2)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between font-semibold">
+                  <span>Total</span>
+                  <span>${selectedOrder.total.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {selectedOrder.shippingAddress && (
+                <>
+                  <Separator />
+                  <div>
+                    <h4 className="font-medium mb-1">Shipping Address</h4>
+                    <p className="text-sm text-muted-foreground">{selectedOrder.shippingAddress}</p>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={isEditProfileOpen} onOpenChange={setIsEditProfileOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Profile</DialogTitle>
+            <DialogDescription>
+              Update your personal information
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Full Name</Label>
+              <Input
+                id="edit-name"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                placeholder="Your name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Email</Label>
+              <Input
+                id="edit-email"
+                value={user.email}
+                disabled
+                className="bg-muted"
+              />
+              <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-phone">Phone Number</Label>
+              <Input
+                id="edit-phone"
+                value={editForm.phone}
+                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                placeholder="+1 (555) 000-0000"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-address">Address</Label>
+              <Input
+                id="edit-address"
+                value={editForm.address}
+                onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                placeholder="123 Main Street"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-city">City</Label>
+                <Input
+                  id="edit-city"
+                  value={editForm.city}
+                  onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                  placeholder="Hartford"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-state">State</Label>
+                <Input
+                  id="edit-state"
+                  value={editForm.state}
+                  onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
+                  placeholder="CT"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-zip">ZIP</Label>
+                <Input
+                  id="edit-zip"
+                  value={editForm.zip}
+                  onChange={(e) => setEditForm({ ...editForm, zip: e.target.value })}
+                  placeholder="06101"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-4">
+              <Button variant="outline" className="flex-1" onClick={() => setIsEditProfileOpen(false)}>
+                Cancel
+              </Button>
+              <Button className="flex-1" onClick={handleSaveProfile}>
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
