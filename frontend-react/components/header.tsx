@@ -11,9 +11,13 @@ import { useAuth } from "@/lib/auth-context"
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { user, logout, isAdmin, isAuthenticated } = useAuth()
-  const { cart } = useStore()
+  
+  // --- CONNECT TO STORE (Get Cart & Wishlist) ---
+  const { cart, wishlist } = useStore() as any
 
-  const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0)
+  // Calculate Counts
+  const cartItemsCount = cart.reduce((sum: number, item: any) => sum + item.quantity, 0)
+  const wishlistCount = wishlist.length
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -77,11 +81,20 @@ export function Header() {
                 </Button>
               </Link>
             )}
+
+            {/* --- WISHLIST BUTTON (Updated with Badge) --- */}
             <Link href="/wishlist">
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="relative">
                 <Heart className="h-5 w-5" />
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-[10px] font-medium text-white flex items-center justify-center">
+                    {wishlistCount}
+                  </span>
+                )}
               </Button>
             </Link>
+
+            {/* --- CART BUTTON --- */}
             <Link href="/cart">
               <Button variant="ghost" size="icon" className="relative">
                 <ShoppingCart className="h-5 w-5" />
@@ -92,6 +105,7 @@ export function Header() {
                 )}
               </Button>
             </Link>
+
             <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
               <Menu className="h-5 w-5" />
             </Button>
