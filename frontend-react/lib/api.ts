@@ -35,5 +35,28 @@ export const api = {
         });
         if (!res.ok) throw new Error("Failed to fetch profile");
         return res.json();
+    },
+
+    async updateProfile(token: string, data: {
+        name?: string;
+        phone?: string;
+        address?: string;
+        city?: string;
+        state?: string;
+        zip?: string;
+    }) {
+        const res = await fetch(`${BASE_URL}/profile/me`, {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || "Failed to update profile");
+        }
+        return res.json();
     }
 };

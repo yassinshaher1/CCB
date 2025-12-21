@@ -9,8 +9,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Lock, CreditCard } from "lucide-react"
 import Image from "next/image"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useStore } from "@/lib/store-context"
+import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 
 export default function CheckoutPage() {
@@ -26,8 +27,25 @@ export default function CheckoutPage() {
     zip: "",
   })
   const { cart, clearCart } = useStore()
+  const { user, isAuthenticated } = useAuth()
   const router = useRouter()
   const cartItems = cart
+
+  // Auto-fill form with user data when authenticated
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const nameParts = user.name.split(" ")
+      const firstName = nameParts[0] || ""
+      const lastName = nameParts.slice(1).join(" ") || ""
+
+      setFormData((prev) => ({
+        ...prev,
+        email: user.email || prev.email,
+        firstName: firstName || prev.firstName,
+        lastName: lastName || prev.lastName,
+      }))
+    }
+  }, [isAuthenticated, user])
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const shipping = subtotal > 100 ? 0 : 15
@@ -81,7 +99,7 @@ export default function CheckoutPage() {
     }
 
     try {
-      const response = await fetch("http://localhost:8000/order", {
+      const response = await fetch("http://localhost:8002/order", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

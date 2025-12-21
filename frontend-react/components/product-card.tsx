@@ -40,7 +40,7 @@ export function ProductCard({ product, defaultSize = "M", defaultColor = "Navy" 
           </div>
         )}
         <Image
-          src={product.image || "/placeholder.svg"}
+          src={product.image || product.imageUrl || "/placeholder.svg"}
           alt={product.name}
           fill
           className="object-cover group-hover:scale-105 transition-transform duration-300"
