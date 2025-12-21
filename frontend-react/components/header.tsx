@@ -1,8 +1,10 @@
 "use client"
 
 import Link from "next/link"
-import { ShoppingCart, Heart, User, Menu, Search, LogOut, Shield } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { ShoppingCart, Heart, User, Menu, Search, LogOut, Shield, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { useState } from "react"
 import Image from "next/image"
 import { useStore } from "@/lib/store-context"
@@ -10,10 +12,27 @@ import { useAuth } from "@/lib/auth-context"
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const router = useRouter()
   const { user, logout, isAdmin, isAuthenticated } = useAuth()
-  const { cart } = useStore()
 
-  const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0)
+  // --- CONNECT TO STORE (Get Cart & Wishlist) ---
+  const { cart, wishlist } = useStore() as any
+
+  // Calculate Counts
+  const cartItemsCount = cart.reduce((sum: number, item: any) => sum + item.quantity, 0)
+  const wishlistCount = wishlist.length
+
+  // Handle search
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      router.push(`/shop?search=${encodeURIComponent(searchQuery.trim())}`)
+      setIsSearchOpen(false)
+      setSearchQuery("")
+    }
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -49,9 +68,29 @@ export function Header() {
 
           {/* Right Actions */}
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="hidden md:flex">
-              <Search className="h-5 w-5" />
-            </Button>
+            {/* Search */}
+            {isSearchOpen ? (
+              <form onSubmit={handleSearch} className="hidden md:flex items-center gap-1">
+                <Input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-48 h-9"
+                  autoFocus
+                />
+                <Button type="submit" variant="ghost" size="icon">
+                  <Search className="h-5 w-5" />
+                </Button>
+                <Button type="button" variant="ghost" size="icon" onClick={() => { setIsSearchOpen(false); setSearchQuery(""); }}>
+                  <X className="h-5 w-5" />
+                </Button>
+              </form>
+            ) : (
+              <Button variant="ghost" size="icon" className="hidden md:flex" onClick={() => setIsSearchOpen(true)}>
+                <Search className="h-5 w-5" />
+              </Button>
+            )}
             {isAdmin && (
               <Link href="/admin">
                 <Button variant="ghost" size="icon" title="Admin Dashboard">
@@ -77,11 +116,20 @@ export function Header() {
                 </Button>
               </Link>
             )}
+
+            {/* --- WISHLIST BUTTON (Updated with Badge) --- */}
             <Link href="/wishlist">
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="relative">
                 <Heart className="h-5 w-5" />
+                {wishlistCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-[10px] font-medium text-white flex items-center justify-center">
+                    {wishlistCount}
+                  </span>
+                )}
               </Button>
             </Link>
+
+            {/* --- CART BUTTON --- */}
             <Link href="/cart">
               <Button variant="ghost" size="icon" className="relative">
                 <ShoppingCart className="h-5 w-5" />
@@ -92,6 +140,7 @@ export function Header() {
                 )}
               </Button>
             </Link>
+
             <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
               <Menu className="h-5 w-5" />
             </Button>

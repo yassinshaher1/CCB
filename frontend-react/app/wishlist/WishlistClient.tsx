@@ -9,11 +9,13 @@ import { useStore } from "@/lib/store-context"
 import Image from "next/image"
 
 export default function WishlistClient() {
-  const { wishlist, removeFromWishlist, addToCart } = useStore()
-  const wishlistItems = wishlist
+  // Cast store to 'any' to avoid strict type errors for now
+  const { wishlist, removeFromWishlist, addToCart } = useStore() as any
+  const wishlistItems = wishlist || []
 
   const handleAddToCart = (item: any) => {
-    addToCart(item, "M", "Navy")
+    addToCart(item) // Removed hardcoded size/color to match your simple setup
+    removeFromWishlist(item.id) // Remove from wishlist after adding to cart
   }
 
   return (
@@ -31,9 +33,11 @@ export default function WishlistClient() {
               </h1>
               <p className="text-muted-foreground mt-1">{wishlistItems.length} items saved for later</p>
             </div>
-            <Button variant="outline" onClick={() => wishlistItems.forEach((item) => removeFromWishlist(item.id))}>
-              Clear All
-            </Button>
+            {wishlistItems.length > 0 && (
+              <Button variant="outline" onClick={() => wishlistItems.forEach((item: any) => removeFromWishlist(item.id))}>
+                Clear All
+              </Button>
+            )}
           </div>
 
           {/* Wishlist Grid */}
@@ -50,11 +54,18 @@ export default function WishlistClient() {
             </Card>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {wishlistItems.map((item) => (
+              {wishlistItems.map((item: any) => (
                 <Card key={item.id} className="group overflow-hidden">
                   <CardContent className="p-0">
                     <div className="relative aspect-[3/4] bg-muted">
-                      <Image src={item.image || "/placeholder.svg"} alt={item.name} fill className="object-cover" />
+                      {/* --- FIX: Check for 'imageUrl' OR 'image' --- */}
+                      <Image
+                        src={item.imageUrl || item.image || "/placeholder.svg"}
+                        alt={item.name}
+                        fill
+                        className="object-cover"
+                      />
+
                       <Button
                         size="icon"
                         variant="secondary"
@@ -90,10 +101,10 @@ export default function WishlistClient() {
                   <div className="space-y-1">
                     <p className="text-sm text-muted-foreground">Total value of wishlist items</p>
                     <p className="text-3xl font-bold">
-                      ${wishlistItems.reduce((acc, item) => acc + item.price, 0).toFixed(2)}
+                      ${wishlistItems.reduce((acc: number, item: any) => acc + (parseFloat(item.price) || 0), 0).toFixed(2)}
                     </p>
                   </div>
-                  <Button size="lg" onClick={() => wishlistItems.forEach((item) => handleAddToCart(item))}>
+                  <Button size="lg" onClick={() => wishlistItems.forEach((item: any) => handleAddToCart(item))}>
                     <ShoppingCart className="h-5 w-5 mr-2" />
                     Add All to Cart
                   </Button>

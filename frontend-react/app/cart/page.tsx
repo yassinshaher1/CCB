@@ -5,18 +5,48 @@ import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react"
+import { Minus, Plus, Trash2, ShoppingBag, Heart } from "lucide-react"
 import Image from "next/image"
 import { useStore } from "@/lib/store-context"
 
 export default function CartPage() {
-  const { cart, removeFromCart, updateQuantity } = useStore()
+  const { cart, removeFromCart, updateQuantity, addToWishlist } = useStore()
   const cartItems = cart
+
+  // Inside your Cart or Checkout component
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const shipping = subtotal > 100 ? 0 : 15
   const tax = subtotal * 0.0635
   const total = subtotal + shipping + tax
+
+  const handleSaveForLater = (item: typeof cartItems[0]) => {
+    // Add to wishlist (without quantity, size, color - just the product)
+    addToWishlist({
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      image: item.image,
+    })
+    // Remove from cart completely
+    cartItems.forEach(() => {
+      if (item.quantity > 0) {
+        for (let i = 0; i < item.quantity; i++) {
+          removeFromCart(item.id)
+        }
+      }
+    })
+    // Since removeFromCart decrements, we need to call it enough times
+    // Actually let's just filter it out properly - the store handles single removals
+    // We'll just remove once which decrements by 1, but we want full removal
+    // Let's loop to remove all quantity
+  }
+
+  const handleRemoveCompletely = (id: number | string, quantity: number) => {
+    for (let i = 0; i < quantity; i++) {
+      removeFromCart(id)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -51,10 +81,30 @@ export default function CartPage() {
                       </p>
                       <p className="font-semibold text-lg">${item.price.toFixed(2)}</p>
                     </div>
-                    <div className="flex flex-col items-end gap-4">
-                      <Button variant="ghost" size="icon" onClick={() => removeFromCart(item.id)} className="h-8 w-8">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveCompletely(item.id, item.quantity)}
+                          className="h-8 w-8"
+                          title="Remove from cart"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            handleSaveForLater(item)
+                            handleRemoveCompletely(item.id, item.quantity)
+                          }}
+                          className="h-8 w-8"
+                          title="Save for later"
+                        >
+                          <Heart className="h-4 w-4" />
+                        </Button>
+                      </div>
                       <div className="flex items-center gap-2">
                         <Button
                           variant="outline"
@@ -111,9 +161,7 @@ export default function CartPage() {
                 <Button asChild className="w-full mb-3" size="lg">
                   <Link href="/checkout">Proceed to Checkout</Link>
                 </Button>
-                <Button asChild variant="outline" className="w-full bg-transparent">
-                  <Link href="/shop">Continue Shopping</Link>
-                </Button>
+
               </Card>
             </div>
           </div>

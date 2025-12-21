@@ -9,8 +9,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Lock, CreditCard } from "lucide-react"
 import Image from "next/image"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useStore } from "@/lib/store-context"
+import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 
 export default function CheckoutPage() {
@@ -25,27 +26,71 @@ export default function CheckoutPage() {
     state: "CT",
     zip: "",
   })
+  const [cardData, setCardData] = useState({
+    cardNumber: "",
+    cardExpiry: "",
+    cardCvc: "",
+  })
   const { cart, clearCart } = useStore()
+  const { user, isAuthenticated } = useAuth()
   const router = useRouter()
   const cartItems = cart
+
+  // Auto-fill form with user data when authenticated
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const nameParts = user.name.split(" ")
+      const firstName = nameParts[0] || ""
+      const lastName = nameParts.slice(1).join(" ") || ""
+
+      setFormData((prev) => ({
+        ...prev,
+        email: user.email || prev.email,
+        firstName: firstName || prev.firstName,
+        lastName: lastName || prev.lastName,
+        // Auto-fill saved shipping address
+        address: user.address || prev.address,
+        city: user.city || prev.city,
+        state: user.state || prev.state,
+        zip: user.zip || prev.zip,
+      }))
+
+      // Auto-fill saved payment card info
+      setCardData({
+        cardNumber: user.cardNumber || "",
+        cardExpiry: user.cardExpiry || "",
+        cardCvc: user.cardCvc || "",
+      })
+    }
+  }, [isAuthenticated, user])
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const shipping = subtotal > 100 ? 0 : 15
   const tax = subtotal * 0.0635
   const total = subtotal + shipping + tax
 
-  const handleCompleteOrder = () => {
+  const handleCompleteOrder = async () => {
+    // Validation
+    const requiredFields = ["email", "firstName", "lastName", "address", "city", "state", "zip"];
+    const emptyFields = requiredFields.filter((field) => !formData[field as keyof typeof formData]);
+
+    if (emptyFields.length > 0) {
+      alert(`Please fill in all required fields: ${emptyFields.join(", ")}`);
+      return;
+    }
     const orderDetails = {
       id: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
       orderNumber: Math.floor(100000 + Math.random() * 900000),
       customerName: `${formData.firstName} ${formData.lastName}`,
       customerEmail: formData.email,
       items: cartItems.map((item) => ({
+        id: item.id,
         name: item.name,
         quantity: item.quantity,
         price: item.price,
         size: item.size,
         color: item.color,
+        image: item.image,
       })),
       subtotal,
       shipping,
@@ -54,6 +99,43 @@ export default function CheckoutPage() {
       status: "Pending" as const,
       date: new Date().toISOString().split("T")[0],
       shippingAddress: `${formData.address}${formData.apartment ? `, ${formData.apartment}` : ""}, ${formData.city}, ${formData.state} ${formData.zip}`,
+    }
+
+    // Backend payload
+    const payload = {
+      userId: formData.email || "guest",
+      cartItems: cartItems.reduce((acc, item) => {
+        acc[item.id] = {
+          quantity: item.quantity,
+          price: item.price,
+          name: item.name
+        };
+        return acc;
+      }, {} as Record<string, any>),
+      totalPrice: total
+    }
+
+    try {
+      const response = await fetch("http://localhost:8002/order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        console.error("Order failed:", await response.text());
+        alert("Failed to submit order to backend. Check console.");
+        // proceed anyway for demo purposes? Or stop?
+        // modifying user flow. I'll proceed so the UI still works as expected by user, but log the error.
+      } else {
+        const data = await response.json();
+        console.log("Order created:", data);
+      }
+    } catch (error) {
+      console.error("Connection error:", error);
+      alert("Could not connect to Order Service.");
     }
 
     // Save to session storage for receipt page
@@ -89,13 +171,14 @@ export default function CheckoutPage() {
                 <h2 className="font-semibold text-xl mb-4">Contact Information</h2>
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email">Email <span className="text-red-500">*</span></Label>
                     <Input
                       id="email"
                       type="email"
                       placeholder="you@example.com"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      required
                     />
                   </div>
                   <div className="flex items-center gap-2">
@@ -113,31 +196,34 @@ export default function CheckoutPage() {
                 <div className="space-y-4">
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="firstName">First Name</Label>
+                      <Label htmlFor="firstName">First Name <span className="text-red-500">*</span></Label>
                       <Input
                         id="firstName"
                         placeholder="John"
                         value={formData.firstName}
                         onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                        required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="lastName">Last Name</Label>
+                      <Label htmlFor="lastName">Last Name <span className="text-red-500">*</span></Label>
                       <Input
                         id="lastName"
                         placeholder="Doe"
                         value={formData.lastName}
                         onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                        required
                       />
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="address">Address</Label>
+                    <Label htmlFor="address">Address <span className="text-red-500">*</span></Label>
                     <Input
                       id="address"
                       placeholder="123 Main Street"
                       value={formData.address}
                       onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      required
                     />
                   </div>
                   <div>
@@ -151,30 +237,33 @@ export default function CheckoutPage() {
                   </div>
                   <div className="grid md:grid-cols-3 gap-4">
                     <div>
-                      <Label htmlFor="city">City</Label>
+                      <Label htmlFor="city">City <span className="text-red-500">*</span></Label>
                       <Input
                         id="city"
                         placeholder="Hartford"
                         value={formData.city}
                         onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                        required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="state">State</Label>
+                      <Label htmlFor="state">State <span className="text-red-500">*</span></Label>
                       <Input
                         id="state"
                         placeholder="CT"
                         value={formData.state}
                         onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                        required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="zip">ZIP Code</Label>
+                      <Label htmlFor="zip">ZIP Code <span className="text-red-500">*</span></Label>
                       <Input
                         id="zip"
                         placeholder="06101"
                         value={formData.zip}
                         onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
+                        required
                       />
                     </div>
                   </div>
@@ -204,16 +293,31 @@ export default function CheckoutPage() {
                   <div className="space-y-4">
                     <div>
                       <Label htmlFor="cardNumber">Card Number</Label>
-                      <Input id="cardNumber" placeholder="1234 5678 9012 3456" />
+                      <Input
+                        id="cardNumber"
+                        placeholder="1234 5678 9012 3456"
+                        value={cardData.cardNumber}
+                        onChange={(e) => setCardData({ ...cardData, cardNumber: e.target.value })}
+                      />
                     </div>
                     <div className="grid grid-cols-3 gap-4">
                       <div className="col-span-2">
                         <Label htmlFor="expiry">Expiry Date</Label>
-                        <Input id="expiry" placeholder="MM / YY" />
+                        <Input
+                          id="expiry"
+                          placeholder="MM / YY"
+                          value={cardData.cardExpiry}
+                          onChange={(e) => setCardData({ ...cardData, cardExpiry: e.target.value })}
+                        />
                       </div>
                       <div>
                         <Label htmlFor="cvc">CVC</Label>
-                        <Input id="cvc" placeholder="123" />
+                        <Input
+                          id="cvc"
+                          placeholder="123"
+                          value={cardData.cardCvc}
+                          onChange={(e) => setCardData({ ...cardData, cardCvc: e.target.value })}
+                        />
                       </div>
                     </div>
                   </div>
