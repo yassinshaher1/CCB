@@ -26,21 +26,21 @@ echo.
 
 :: Start User Profile Service (Port 8000)
 echo [1/4] Starting User Profile Service on port 8000...
-start "User Profile Service - Port 8000" cmd /k "cd /d "%~dp0" && call .venv\Scripts\activate.bat && cd user-profile-service && python -m uvicorn app:app --reload --port 8000"
+start "User Profile Service - Port 8000" cmd /k "cd /d "%~dp0" && call .venv\Scripts\activate.bat && cd user-profile-service && python -m uvicorn app:app --port 8000"
 
 :: Wait a moment for the service to start
 timeout /t 2 /nobreak >nul
 
 :: Start Catalog Service (Port 8001)
 echo [2/4] Starting Catalog Service on port 8001...
-start "Catalog Service - Port 8001" cmd /k "cd /d "%~dp0" && call .venv\Scripts\activate.bat && cd catalog-service && python -m uvicorn app:app --reload --port 8001"
+start "Catalog Service - Port 8001" cmd /k "cd /d "%~dp0" && call .venv\Scripts\activate.bat && cd catalog-service && python -m uvicorn app:app --port 8001"
 
 :: Wait a moment for the service to start
 timeout /t 2 /nobreak >nul
 
 :: Start Order Service (Port 8002)
 echo [3/4] Starting Order Service on port 8002...
-start "Order Service - Port 8002" cmd /k "cd /d "%~dp0" && call .venv\Scripts\activate.bat && cd order-service && python -m uvicorn app:app --reload --port 8002"
+start "Order Service - Port 8002" cmd /k "cd /d "%~dp0" && call .venv\Scripts\activate.bat && cd order-service && python -m uvicorn app:app --port 8002"
 
 :: Wait a moment for the service to start
 timeout /t 2 /nobreak >nul
