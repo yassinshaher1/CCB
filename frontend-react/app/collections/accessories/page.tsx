@@ -1,55 +1,31 @@
+"use client"
+
 import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import Image from "next/image"
 import { ProductCard } from "@/components/product-card"
-
-const accessoriesProducts = [
-  {
-    id: 41,
-    name: "Leather Portfolio",
-    price: 249,
-    image: "/placeholder.svg?height=500&width=400",
-    description: "Full-grain leather with brass hardware",
-  },
-  {
-    id: 42,
-    name: "Cashmere Scarf",
-    price: 189,
-    image: "/placeholder.svg?height=500&width=400",
-    description: "Luxuriously soft 100% cashmere",
-  },
-  {
-    id: 43,
-    name: "Classic Wallet",
-    price: 129,
-    image: "/placeholder.svg?height=500&width=400",
-    description: "Bi-fold design in premium leather",
-  },
-  {
-    id: 44,
-    name: "Leather Gloves",
-    price: 159,
-    image: "/placeholder.svg?height=500&width=400",
-    description: "Lined with cashmere for warmth",
-  },
-  {
-    id: 45,
-    name: "Signature Belt",
-    price: 109,
-    image: "/placeholder.svg?height=500&width=400",
-    description: "Italian leather with polished buckle",
-  },
-  {
-    id: 46,
-    name: "Sunglasses",
-    price: 199,
-    image: "/placeholder.svg?height=500&width=400",
-    description: "UV protection with premium lenses",
-  },
-]
+import { useState, useEffect } from "react"
 
 export default function AccessoriesCollectionPage() {
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Fetch products from API
+  useEffect(() => {
+    fetch('http://localhost:8001/products')
+      .then((res) => res.json())
+      .then((data) => {
+        setProducts(Array.isArray(data) ? data : [])
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error(err)
+        setProducts([])
+        setLoading(false)
+      })
+  }, [])
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -85,11 +61,21 @@ export default function AccessoriesCollectionPage() {
       {/* Products Grid */}
       <section className="py-12">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {accessoriesProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="text-center py-20">
+              <p className="text-muted-foreground text-lg">No products available</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

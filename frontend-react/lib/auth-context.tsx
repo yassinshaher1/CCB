@@ -17,6 +17,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null
+  token: string | null
   login: (email: string, password: string) => Promise<User | null>
   logout: () => void
   updateUser: (updates: Partial<User>) => Promise<boolean>
@@ -32,13 +33,18 @@ const ADMIN_PASSWORD = "admin123"
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [token, setToken] = useState<string | null>(null)
   const router = useRouter()
 
-  // Load user from localStorage on mount
+  // Load user and token from localStorage on mount
   useEffect(() => {
     const savedUser = localStorage.getItem("ccb-user")
+    const savedToken = localStorage.getItem("ccb-token")
     if (savedUser) {
       setUser(JSON.parse(savedUser))
+    }
+    if (savedToken) {
+      setToken(savedToken)
     }
   }, [])
 
@@ -70,6 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
 
       setUser(authUser);
+      setToken(data.access_token);
       localStorage.setItem("ccb-token", data.access_token);
       return authUser;
     } catch (error) {
@@ -104,6 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     setUser(null)
+    setToken(null)
     localStorage.removeItem("ccb-user")
     localStorage.removeItem("ccb-token")
     router.push("/")
@@ -113,6 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        token,
         login,
         logout,
         updateUser,
