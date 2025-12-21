@@ -140,9 +140,14 @@ export default function ProductsPage() {
     }
   }
 
-  const filteredProducts = products.filter((product) =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredProducts = products.filter((product) => {
+    const query = searchQuery.toLowerCase()
+    return (
+      product.name.toLowerCase().includes(query) ||
+      (product.description?.toLowerCase().includes(query) ?? false) ||
+      (product.categoryId?.toLowerCase().includes(query) ?? false)
+    )
+  })
 
   if (!isAdmin) return null
 
@@ -172,10 +177,11 @@ export default function ProductsPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search products..."
+              placeholder="Search by name, category, or description..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
+              autoComplete="off"
             />
           </div>
         </div>

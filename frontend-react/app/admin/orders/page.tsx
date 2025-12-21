@@ -120,6 +120,7 @@ export default function OrdersPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
+              autoComplete="off"
             />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>

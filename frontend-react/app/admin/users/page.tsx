@@ -148,11 +148,15 @@ export default function UsersPage() {
     }
 
     const displayData = activeTab === "users" ? users : admins
-    const filteredData = displayData.filter(
-        (user) =>
-            user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            user.email?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    const filteredData = displayData.filter((user) => {
+        const query = searchQuery.toLowerCase()
+        return (
+            user.name?.toLowerCase().includes(query) ||
+            user.email?.toLowerCase().includes(query) ||
+            user.role?.toLowerCase().includes(query) ||
+            user.status?.toLowerCase().includes(query)
+        )
+    })
 
     if (!isAdmin) return null
 
@@ -196,10 +200,11 @@ export default function UsersPage() {
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Search by name or email..."
+                            placeholder="Search by name, email, role, or status..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="pl-10"
+                            autoComplete="off"
                         />
                     </div>
                 </div>
