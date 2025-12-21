@@ -11,5 +11,5 @@ if not firebase_admin._apps:
         "databaseURL": DATABASE_URL
     })
 
-def get_db_ref(path: str):
-    return db.reference(path)
+def get_db():
+    return db.reference()
