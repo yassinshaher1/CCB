@@ -1,55 +1,31 @@
+"use client"
+
 import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import Image from "next/image"
 import { ProductCard } from "@/components/product-card"
-
-const casualProducts = [
-  {
-    id: 21,
-    name: "Cotton Henley Shirt",
-    price: 79,
-    image: "/placeholder.svg?height=500&width=400",
-    description: "Soft cotton for everyday comfort",
-  },
-  {
-    id: 22,
-    name: "Casual Denim Jacket",
-    price: 189,
-    image: "/placeholder.svg?height=500&width=400",
-    description: "Classic denim with modern fit",
-  },
-  {
-    id: 23,
-    name: "Weekend Chino Shorts",
-    price: 89,
-    image: "/placeholder.svg?height=500&width=400",
-    description: "Perfect for casual outings",
-  },
-  {
-    id: 24,
-    name: "Comfort Fit Polo",
-    price: 69,
-    image: "/placeholder.svg?height=500&width=400",
-    description: "Breathable fabric for all-day wear",
-  },
-  {
-    id: 25,
-    name: "Canvas Sneakers",
-    price: 129,
-    image: "/placeholder.svg?height=500&width=400",
-    description: "Versatile footwear for any occasion",
-  },
-  {
-    id: 26,
-    name: "Casual Backpack",
-    price: 149,
-    image: "/placeholder.svg?height=500&width=400",
-    description: "Durable and stylish everyday carry",
-  },
-]
+import { useState, useEffect } from "react"
 
 export default function CasualCollectionPage() {
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Fetch products from API
+  useEffect(() => {
+    fetch('http://localhost:8001/products')
+      .then((res) => res.json())
+      .then((data) => {
+        setProducts(Array.isArray(data) ? data : [])
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error(err)
+        setProducts([])
+        setLoading(false)
+      })
+  }, [])
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -82,11 +58,21 @@ export default function CasualCollectionPage() {
       {/* Products Grid */}
       <section className="py-12">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {casualProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="text-center py-20">
+              <p className="text-muted-foreground text-lg">No products available</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

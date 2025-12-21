@@ -1,55 +1,31 @@
+"use client"
+
 import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import Image from "next/image"
 import { ProductCard } from "@/components/product-card"
-
-const heritageProducts = [
-  {
-    id: 1,
-    name: "Heritage Navy Blazer",
-    price: 399,
-    image: "/classic-navy-blazer-vintage-style.jpg",
-    description: "Timeless elegance with traditional tailoring",
-  },
-  {
-    id: 2,
-    name: "Classic Trench Coat",
-    price: 449,
-    image: "/beige-trench-coat-classic.jpg",
-    description: "Inspired by 1940s Connecticut style",
-  },
-  {
-    id: 3,
-    name: "Vintage Wool Vest",
-    price: 189,
-    image: "/wool-vest-vintage-brown.jpg",
-    description: "Heritage craftsmanship meets modern comfort",
-  },
-  {
-    id: 4,
-    name: "Traditional Oxford Shirt",
-    price: 119,
-    image: "/white-oxford-shirt-classic.jpg",
-    description: "Premium cotton with button-down collar",
-  },
-  {
-    id: 5,
-    name: "Leather Brogues",
-    price: 299,
-    image: "/brown-leather-brogue-shoes.jpg",
-    description: "Handcrafted leather with Goodyear welting",
-  },
-  {
-    id: 6,
-    name: "Heritage Tie Collection",
-    price: 89,
-    image: "/silk-tie-navy-pattern.jpg",
-    description: "Pure silk with traditional patterns",
-  },
-]
+import { useState, useEffect } from "react"
 
 export default function HeritageCollectionPage() {
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Fetch products from API
+  useEffect(() => {
+    fetch('http://localhost:8001/products')
+      .then((res) => res.json())
+      .then((data) => {
+        setProducts(Array.isArray(data) ? data : [])
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error(err)
+        setProducts([])
+        setLoading(false)
+      })
+  }, [])
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -85,11 +61,21 @@ export default function HeritageCollectionPage() {
       {/* Products Grid */}
       <section className="py-12">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {heritageProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="text-center py-20">
+              <p className="text-muted-foreground text-lg">No products available</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
