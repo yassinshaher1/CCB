@@ -256,13 +256,8 @@ export default function UsersPage() {
                                                     <td className="p-4">
                                                         <span
                                                             className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${user.role === "admin"
-<<<<<<< HEAD
                                                                 ? "bg-purple-100 text-purple-800"
                                                                 : "bg-blue-100 text-blue-800"
-=======
-                                                                    ? "bg-purple-100 text-purple-800"
-                                                                    : "bg-blue-100 text-blue-800"
->>>>>>> origin/Dev
                                                                 }`}
                                                         >
                                                             {user.role === "admin" ? <Shield className="h-3 w-3" /> : <Users className="h-3 w-3" />}
@@ -272,13 +267,8 @@ export default function UsersPage() {
                                                     <td className="p-4">
                                                         <span
                                                             className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${user.status === "active"
-<<<<<<< HEAD
                                                                 ? "bg-green-100 text-green-800"
                                                                 : "bg-red-100 text-red-800"
-=======
-                                                                    ? "bg-green-100 text-green-800"
-                                                                    : "bg-red-100 text-red-800"
->>>>>>> origin/Dev
                                                                 }`}
                                                         >
                                                             {user.status || "active"}
