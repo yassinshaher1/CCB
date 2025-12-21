@@ -13,6 +13,10 @@ interface User {
   city?: string
   state?: string
   zip?: string
+  // Payment info (stored locally, not sent to backend)
+  cardNumber?: string
+  cardExpiry?: string
+  cardCvc?: string
 }
 
 interface AuthContextType {

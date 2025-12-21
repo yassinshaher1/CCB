@@ -26,6 +26,11 @@ export default function CheckoutPage() {
     state: "CT",
     zip: "",
   })
+  const [cardData, setCardData] = useState({
+    cardNumber: "",
+    cardExpiry: "",
+    cardCvc: "",
+  })
   const { cart, clearCart } = useStore()
   const { user, isAuthenticated } = useAuth()
   const router = useRouter()
@@ -43,7 +48,19 @@ export default function CheckoutPage() {
         email: user.email || prev.email,
         firstName: firstName || prev.firstName,
         lastName: lastName || prev.lastName,
+        // Auto-fill saved shipping address
+        address: user.address || prev.address,
+        city: user.city || prev.city,
+        state: user.state || prev.state,
+        zip: user.zip || prev.zip,
       }))
+
+      // Auto-fill saved payment card info
+      setCardData({
+        cardNumber: user.cardNumber || "",
+        cardExpiry: user.cardExpiry || "",
+        cardCvc: user.cardCvc || "",
+      })
     }
   }, [isAuthenticated, user])
 
@@ -276,16 +293,31 @@ export default function CheckoutPage() {
                   <div className="space-y-4">
                     <div>
                       <Label htmlFor="cardNumber">Card Number</Label>
-                      <Input id="cardNumber" placeholder="1234 5678 9012 3456" />
+                      <Input
+                        id="cardNumber"
+                        placeholder="1234 5678 9012 3456"
+                        value={cardData.cardNumber}
+                        onChange={(e) => setCardData({ ...cardData, cardNumber: e.target.value })}
+                      />
                     </div>
                     <div className="grid grid-cols-3 gap-4">
                       <div className="col-span-2">
                         <Label htmlFor="expiry">Expiry Date</Label>
-                        <Input id="expiry" placeholder="MM / YY" />
+                        <Input
+                          id="expiry"
+                          placeholder="MM / YY"
+                          value={cardData.cardExpiry}
+                          onChange={(e) => setCardData({ ...cardData, cardExpiry: e.target.value })}
+                        />
                       </div>
                       <div>
                         <Label htmlFor="cvc">CVC</Label>
-                        <Input id="cvc" placeholder="123" />
+                        <Input
+                          id="cvc"
+                          placeholder="123"
+                          value={cardData.cardCvc}
+                          onChange={(e) => setCardData({ ...cardData, cardCvc: e.target.value })}
+                        />
                       </div>
                     </div>
                   </div>
