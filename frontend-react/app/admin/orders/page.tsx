@@ -23,7 +23,7 @@ interface Order {
 }
 
 export default function OrdersPage() {
-  const { isAdmin, isAuthenticated } = useAuth()
+  const { isAdmin, isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
   const [orders, setOrders] = useState<Order[]>([])
   const [searchQuery, setSearchQuery] = useState("")
@@ -32,6 +32,9 @@ export default function OrdersPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
 
   useEffect(() => {
+    // Wait for auth to finish loading before checking auth status
+    if (isLoading) return
+
     if (!isAuthenticated || !isAdmin) {
       router.push("/login")
       return
@@ -48,7 +51,7 @@ export default function OrdersPage() {
 
     const interval = setInterval(loadOrders, 2000)
     return () => clearInterval(interval)
-  }, [isAuthenticated, isAdmin, router])
+  }, [isLoading, isAuthenticated, isAdmin, router])
 
   const handleStatusChange = (orderId: string, newStatus: Order["status"]) => {
     const updated = orders.map((order) => (order.id === orderId ? { ...order, status: newStatus } : order))
@@ -117,6 +120,7 @@ export default function OrdersPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
+              autoComplete="off"
             />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>

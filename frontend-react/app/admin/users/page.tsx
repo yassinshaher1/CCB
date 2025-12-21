@@ -39,7 +39,7 @@ interface User {
 }
 
 export default function UsersPage() {
-    const { isAdmin, isAuthenticated, token } = useAuth()
+    const { isAdmin, isAuthenticated, isLoading, token } = useAuth()
     const router = useRouter()
     const [users, setUsers] = useState<User[]>([])
     const [admins, setAdmins] = useState<User[]>([])
@@ -79,12 +79,15 @@ export default function UsersPage() {
     }
 
     useEffect(() => {
+        // Wait for auth to finish loading before checking auth status
+        if (isLoading) return
+
         if (!isAuthenticated || !isAdmin) {
             router.push("/login")
             return
         }
         fetchUsers()
-    }, [isAuthenticated, isAdmin, router, token])
+    }, [isLoading, isAuthenticated, isAdmin, router, token])
 
     const handleOpenEditDialog = (user: User) => {
         setEditingUser(user)
@@ -145,11 +148,15 @@ export default function UsersPage() {
     }
 
     const displayData = activeTab === "users" ? users : admins
-    const filteredData = displayData.filter(
-        (user) =>
-            user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            user.email?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    const filteredData = displayData.filter((user) => {
+        const query = searchQuery.toLowerCase()
+        return (
+            user.name?.toLowerCase().includes(query) ||
+            user.email?.toLowerCase().includes(query) ||
+            user.role?.toLowerCase().includes(query) ||
+            user.status?.toLowerCase().includes(query)
+        )
+    })
 
     if (!isAdmin) return null
 
@@ -193,10 +200,11 @@ export default function UsersPage() {
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Search by name or email..."
+                            placeholder="Search by name, email, role, or status..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="pl-10"
+                            autoComplete="off"
                         />
                     </div>
                 </div>
@@ -249,8 +257,8 @@ export default function UsersPage() {
                                                     <td className="p-4">
                                                         <span
                                                             className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${user.role === "admin"
-                                                                    ? "bg-purple-100 text-purple-800"
-                                                                    : "bg-blue-100 text-blue-800"
+                                                                ? "bg-purple-100 text-purple-800"
+                                                                : "bg-blue-100 text-blue-800"
                                                                 }`}
                                                         >
                                                             {user.role === "admin" ? <Shield className="h-3 w-3" /> : <Users className="h-3 w-3" />}
@@ -260,8 +268,8 @@ export default function UsersPage() {
                                                     <td className="p-4">
                                                         <span
                                                             className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${user.status === "active"
-                                                                    ? "bg-green-100 text-green-800"
-                                                                    : "bg-red-100 text-red-800"
+                                                                ? "bg-green-100 text-green-800"
+                                                                : "bg-red-100 text-red-800"
                                                                 }`}
                                                         >
                                                             {user.status || "active"}

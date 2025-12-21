@@ -32,7 +32,7 @@ interface Product {
 }
 
 export default function ProductsPage() {
-  const { isAdmin, isAuthenticated } = useAuth()
+  const { isAdmin, isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -63,12 +63,15 @@ export default function ProductsPage() {
   }
 
   useEffect(() => {
+    // Wait for auth to finish loading before checking auth status
+    if (isLoading) return
+
     if (!isAuthenticated || !isAdmin) {
       router.push("/login")
       return
     }
     fetchProducts()
-  }, [isAuthenticated, isAdmin, router])
+  }, [isLoading, isAuthenticated, isAdmin, router])
 
   const handleOpenDialog = (product?: Product) => {
     if (product) {
@@ -137,9 +140,14 @@ export default function ProductsPage() {
     }
   }
 
-  const filteredProducts = products.filter((product) =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredProducts = products.filter((product) => {
+    const query = searchQuery.toLowerCase()
+    return (
+      product.name.toLowerCase().includes(query) ||
+      (product.description?.toLowerCase().includes(query) ?? false) ||
+      (product.categoryId?.toLowerCase().includes(query) ?? false)
+    )
+  })
 
   if (!isAdmin) return null
 
@@ -169,10 +177,11 @@ export default function ProductsPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search products..."
+              placeholder="Search by name, category, or description..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
+              autoComplete="off"
             />
           </div>
         </div>
@@ -225,10 +234,10 @@ export default function ProductsPage() {
                           <td className="p-4">
                             <span
                               className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${(product.stock || 0) > 10
-                                  ? "bg-green-100 text-green-800"
-                                  : (product.stock || 0) > 0
-                                    ? "bg-orange-100 text-orange-800"
-                                    : "bg-red-100 text-red-800"
+                                ? "bg-green-100 text-green-800"
+                                : (product.stock || 0) > 0
+                                  ? "bg-orange-100 text-orange-800"
+                                  : "bg-red-100 text-red-800"
                                 }`}
                             >
                               {product.stock || 0} units
