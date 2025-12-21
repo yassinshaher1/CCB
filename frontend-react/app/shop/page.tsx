@@ -8,100 +8,28 @@ import Link from "next/link"
 import Image from "next/image"
 import { useSearchParams } from "next/navigation"
 
-const products = [
-  {
-    id: 1,
-    name: "Classic Navy Blazer",
-    price: 299,
-    category: "mens",
-    image: "/navy-blazer.png",
-    badge: "Bestseller",
-  },
-  {
-    id: 2,
-    name: "White Oxford Shirt",
-    price: 89,
-    category: "mens",
-    image: "/white-oxford-shirt.png",
-  },
-  {
-    id: 3,
-    name: "Premium Khaki Chinos",
-    price: 129,
-    category: "mens",
-    image: "/khaki-chinos.jpg",
-  },
-  {
-    id: 4,
-    name: "Cashmere Sweater",
-    price: 249,
-    category: "womens",
-    image: "/navy-cashmere-sweater.jpg",
-    badge: "New",
-  },
-  {
-    id: 5,
-    name: "Leather Belt",
-    price: 79,
-    category: "accessories",
-    image: "/brown-leather-belt.png",
-  },
-  {
-    id: 6,
-    name: "Silk Scarf",
-    price: 95,
-    category: "accessories",
-    image: "/silk-scarf-navy-white.png",
-  },
-  {
-    id: 7,
-    name: "Tailored Dress Pants",
-    price: 159,
-    category: "mens",
-    image: "/navy-dress-pants.jpg",
-  },
-  {
-    id: 8,
-    name: "Elegant Midi Dress",
-    price: 189,
-    category: "womens",
-    image: "/elegant-navy-midi-dress.jpg",
-  },
-  {
-    id: 9,
-    name: "Cotton Polo Shirt",
-    price: 69,
-    category: "mens",
-    image: "/white-polo-shirt.png",
-  },
-  {
-    id: 10,
-    name: "Wool Coat",
-    price: 399,
-    category: "womens",
-    image: "/navy-wool-coat.jpg",
-    badge: "Premium",
-  },
-  {
-    id: 11,
-    name: "Leather Handbag",
-    price: 299,
-    category: "accessories",
-    image: "/brown-leather-handbag.jpg",
-  },
-  {
-    id: 12,
-    name: "Designer Sunglasses",
-    price: 149,
-    category: "accessories",
-    image: "/classic-sunglasses.png",
-  },
-]
-
 export default function ShopPage() {
   const searchParams = useSearchParams()
   const categoryParam = searchParams?.get("category")
+  const searchQuery = searchParams?.get("search") || ""
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Fetch products from API
+  useEffect(() => {
+    fetch('http://localhost:8001/products')
+      .then((res) => res.json())
+      .then((data) => {
+        setProducts(Array.isArray(data) ? data : [])
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error(err)
+        setProducts([])
+        setLoading(false)
+      })
+  }, [])
 
   useEffect(() => {
     if (categoryParam) {
@@ -109,8 +37,12 @@ export default function ShopPage() {
     }
   }, [categoryParam])
 
-  const filteredProducts =
-    selectedCategory === "all" ? products : products.filter((p) => p.category === selectedCategory)
+  // Filter by category and search query
+  const filteredProducts = products.filter((p) => {
+    const matchesCategory = selectedCategory === "all" || p.categoryId === selectedCategory
+    const matchesSearch = searchQuery === "" || p.name.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesCategory && matchesSearch
+  })
 
   return (
     <div className="min-h-screen bg-background">
@@ -154,11 +86,26 @@ export default function ShopPage() {
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="text-center py-20">
+            <p className="text-muted-foreground text-lg">No products found</p>
+            {searchQuery && (
+              <p className="text-sm text-muted-foreground mt-2">
+                Try searching for something else
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            {filteredProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        )}
 
         {/* CTA Section */}
         <div className="bg-secondary/30 rounded-lg p-8 md:p-12 text-center">

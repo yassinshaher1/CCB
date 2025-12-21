@@ -26,12 +26,12 @@ export function LoginForm() {
     setIsLoading(true)
     setError("")
 
-    const success = await login(formData.email, formData.password)
+    const user = await login(formData.email, formData.password)
 
     setIsLoading(false)
 
-    if (success) {
-      if (formData.email === "admin@ccb.com") {
+    if (user) {
+      if (user.isAdmin) {
         router.push("/admin")
       } else {
         router.push("/profile")
@@ -57,6 +57,7 @@ export function LoginForm() {
             type="email"
             placeholder="you@example.com"
             required
+            suppressHydrationWarning
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
           />

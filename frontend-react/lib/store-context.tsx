@@ -8,9 +8,12 @@ export interface Product {
   id: number | string
   name: string
   price: number
-  image: string
+  image?: string
+  imageUrl?: string  // API uses imageUrl
   category?: string
+  categoryId?: string  // API uses categoryId
   description?: string
+  stock?: number
 }
 
 export interface CartItem extends Product {
@@ -60,7 +63,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setCart((prev) => {
       // Check if exact item exists
       const existing = prev.find((item) => item.id === product.id)
-      
+
       if (existing) {
         // If exists, just increase quantity
         return prev.map((item) =>
@@ -81,7 +84,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
       // If quantity is more than 1, just decrease it
       if (existingItem && existingItem.quantity > 1) {
-         return prev.map((item) =>
+        return prev.map((item) =>
           item.id === id ? { ...item, quantity: item.quantity - 1 } : item
         );
       }

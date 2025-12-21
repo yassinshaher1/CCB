@@ -1,55 +1,31 @@
+"use client"
+
 import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import Image from "next/image"
 import { ProductCard } from "@/components/product-card"
-
-const modernProducts = [
-  {
-    id: 11,
-    name: "Contemporary Bomber Jacket",
-    price: 329,
-    image: "/modern-bomber-jacket-navy.jpg",
-    description: "Urban style with premium materials",
-  },
-  {
-    id: 12,
-    name: "Minimalist Turtleneck",
-    price: 159,
-    image: "/black-turtleneck-modern.jpg",
-    description: "Clean lines and contemporary fit",
-  },
-  {
-    id: 13,
-    name: "Tech Fabric Chinos",
-    price: 179,
-    image: "/modern-chinos-navy-tech-fabric.jpg",
-    description: "Performance meets style",
-  },
-  {
-    id: 14,
-    name: "Modern Fit Dress Shirt",
-    price: 139,
-    image: "/placeholder.svg?height=500&width=400",
-    description: "Sleek silhouette for the modern professional",
-  },
-  {
-    id: 15,
-    name: "Urban Sneakers",
-    price: 249,
-    image: "/placeholder.svg?height=500&width=400",
-    description: "Contemporary design with Italian craftsmanship",
-  },
-  {
-    id: 16,
-    name: "Minimalist Watch",
-    price: 399,
-    image: "/placeholder.svg?height=500&width=400",
-    description: "Swiss movement in a timeless design",
-  },
-]
+import { useState, useEffect } from "react"
 
 export default function ModernCollectionPage() {
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Fetch products from API
+  useEffect(() => {
+    fetch('http://localhost:8001/products')
+      .then((res) => res.json())
+      .then((data) => {
+        setProducts(Array.isArray(data) ? data : [])
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error(err)
+        setProducts([])
+        setLoading(false)
+      })
+  }, [])
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -85,11 +61,21 @@ export default function ModernCollectionPage() {
       {/* Products Grid */}
       <section className="py-12">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {modernProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="text-center py-20">
+              <p className="text-muted-foreground text-lg">No products available</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
