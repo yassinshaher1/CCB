@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Package, Settings, MapPin, CreditCard, Bell, Shield, LogOut, X, RotateCcw } from "lucide-react"
+import { Package, Settings, MapPin, CreditCard, Shield, LogOut, X, RotateCcw } from "lucide-react"
 import { Header } from "@/components/header"
 
 interface OrderItem {
@@ -63,6 +63,17 @@ export default function ProfilePage() {
     state: "CT",
     zip: "",
   })
+  const [paymentForm, setPaymentForm] = useState({
+    cardNumber: "",
+    cardExpiry: "",
+    cardCvc: "",
+  })
+  const [shippingForm, setShippingForm] = useState({
+    address: "",
+    city: "",
+    state: "CT",
+    zip: "",
+  })
 
   // Load orders from localStorage
   useEffect(() => {
@@ -83,6 +94,21 @@ export default function ProfilePage() {
         state: user.state || "CT",
         zip: user.zip || "",
       })
+
+      // Initialize payment form
+      setPaymentForm({
+        cardNumber: user.cardNumber || "",
+        cardExpiry: user.cardExpiry || "",
+        cardCvc: user.cardCvc || "",
+      })
+
+      // Initialize shipping form
+      setShippingForm({
+        address: user.address || "",
+        city: user.city || "",
+        state: user.state || "CT",
+        zip: user.zip || "",
+      })
     }
   }, [user])
 
@@ -98,7 +124,15 @@ export default function ProfilePage() {
     return null
   }
 
-  const totalSpent = orders.reduce((sum, order) => sum + order.total, 0)
+  // Exclude refunded orders from total spent
+  const totalSpent = orders
+    .filter(order => order.status !== "Refunded")
+    .reduce((sum, order) => sum + order.total, 0)
+
+  // Track refunded amount
+  const totalRefunded = orders
+    .filter(order => order.status === "Refunded")
+    .reduce((sum, order) => sum + order.total, 0)
 
   const handleSaveProfile = async () => {
     const success = await updateUser(editForm)
@@ -181,7 +215,13 @@ export default function ProfilePage() {
                 <CardTitle className="text-3xl">${totalSpent.toFixed(2)}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-xs text-muted-foreground">All time</p>
+                {totalRefunded > 0 ? (
+                  <p className="text-xs text-emerald-600">
+                    ${totalRefunded.toFixed(2)} refunded
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">All time</p>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -236,50 +276,131 @@ export default function ProfilePage() {
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-4">
+              {/* Payment Method Card */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Account Settings</CardTitle>
-                  <CardDescription>Manage your account preferences</CardDescription>
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5 text-primary" />
+                    <CardTitle>Payment Method</CardTitle>
+                  </div>
+                  <CardDescription>Save your card for faster checkout</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <Bell className="h-4 w-4 text-muted-foreground" />
-                        <p className="font-medium">Email Notifications</p>
-                      </div>
-                      <p className="text-sm text-muted-foreground">Receive updates about your orders and promotions</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Configure
-                    </Button>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="cardNumber">Card Number</Label>
+                    <Input
+                      id="cardNumber"
+                      placeholder="1234 5678 9012 3456"
+                      value={paymentForm.cardNumber}
+                      onChange={(e) => setPaymentForm({ ...paymentForm, cardNumber: e.target.value })}
+                    />
                   </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4 text-muted-foreground" />
-                        <p className="font-medium">Payment Methods</p>
-                      </div>
-                      <p className="text-sm text-muted-foreground">Manage your saved payment options</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="cardExpiry">Expiry Date</Label>
+                      <Input
+                        id="cardExpiry"
+                        placeholder="MM / YY"
+                        value={paymentForm.cardExpiry}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, cardExpiry: e.target.value })}
+                      />
                     </div>
-                    <Button variant="outline" size="sm">
-                      Manage
-                    </Button>
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <p className="font-medium">Shipping Addresses</p>
-                      </div>
-                      <p className="text-sm text-muted-foreground">Update your delivery addresses</p>
+                    <div className="space-y-2">
+                      <Label htmlFor="cardCvc">CVC</Label>
+                      <Input
+                        id="cardCvc"
+                        placeholder="123"
+                        value={paymentForm.cardCvc}
+                        onChange={(e) => setPaymentForm({ ...paymentForm, cardCvc: e.target.value })}
+                      />
                     </div>
-                    <Button variant="outline" size="sm">
-                      Edit
-                    </Button>
                   </div>
+                  <Button
+                    className="w-full"
+                    onClick={async () => {
+                      const success = await updateUser({
+                        cardNumber: paymentForm.cardNumber,
+                        cardExpiry: paymentForm.cardExpiry,
+                        cardCvc: paymentForm.cardCvc,
+                      })
+                      if (success) {
+                        alert("Payment method saved!")
+                      } else {
+                        alert("Failed to save payment method")
+                      }
+                    }}
+                  >
+                    Save Payment Method
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Shipping Address Card */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-primary" />
+                    <CardTitle>Shipping Address</CardTitle>
+                  </div>
+                  <CardDescription>Save your address for faster checkout</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="shippingAddress">Street Address</Label>
+                    <Input
+                      id="shippingAddress"
+                      placeholder="123 Main Street"
+                      value={shippingForm.address}
+                      onChange={(e) => setShippingForm({ ...shippingForm, address: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="shippingCity">City</Label>
+                      <Input
+                        id="shippingCity"
+                        placeholder="Hartford"
+                        value={shippingForm.city}
+                        onChange={(e) => setShippingForm({ ...shippingForm, city: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="shippingState">State</Label>
+                      <Input
+                        id="shippingState"
+                        placeholder="CT"
+                        value={shippingForm.state}
+                        onChange={(e) => setShippingForm({ ...shippingForm, state: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="shippingZip">ZIP Code</Label>
+                      <Input
+                        id="shippingZip"
+                        placeholder="06101"
+                        value={shippingForm.zip}
+                        onChange={(e) => setShippingForm({ ...shippingForm, zip: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    className="w-full"
+                    onClick={async () => {
+                      const success = await updateUser({
+                        address: shippingForm.address,
+                        city: shippingForm.city,
+                        state: shippingForm.state,
+                        zip: shippingForm.zip,
+                      })
+                      if (success) {
+                        alert("Shipping address saved!")
+                      } else {
+                        alert("Failed to save shipping address")
+                      }
+                    }}
+                  >
+                    Save Shipping Address
+                  </Button>
                 </CardContent>
               </Card>
             </TabsContent>

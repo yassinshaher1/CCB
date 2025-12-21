@@ -6,21 +6,24 @@ import { Header } from "@/components/header"
 import { ArrowRight, ShoppingBag, Plus, Trash2, Edit, Minus, Heart } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useStore } from "@/lib/store-context"
+import { useAuth } from "@/lib/auth-context"
 
 export default function HomePage() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(true);
+
+  // Get actual admin status from auth context
+  const { isAdmin } = useAuth();
 
   // --- STORE HOOKS ---
-  const { 
-    cart, 
-    addToCart, 
-    removeFromCart, 
-    addToWishlist, 
-    removeFromWishlist, 
-    isInWishlist 
-  } = useStore() as any; 
+  const {
+    cart,
+    addToCart,
+    removeFromCart,
+    addToWishlist,
+    removeFromWishlist,
+    isInWishlist
+  } = useStore() as any;
 
   // --- FETCH PRODUCTS ---
   const fetchProducts = () => {
@@ -63,7 +66,7 @@ export default function HomePage() {
       price: parseFloat(price || "0"),
       description: desc,
       stock: parseInt(stock || "0"),
-      imageUrl: imageUrl || "", 
+      imageUrl: imageUrl || "",
       categoryId: "general"
     };
 
@@ -83,13 +86,13 @@ export default function HomePage() {
 
   const handleEdit = async (product: any) => {
     const newName = prompt("Edit Name:", product.name);
-    if (newName === null) return; 
+    if (newName === null) return;
 
     const newPrice = prompt("Edit Price:", product.price);
     const newDesc = prompt("Edit Description:", product.description);
     const newStock = prompt("Edit Stock:", product.stock);
     const newImage = prompt("Edit Image URL:", product.imageUrl);
-    
+
     const updatedProduct = {
       ...product,
       name: newName,
@@ -118,7 +121,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-background relative">
       <Header />
-      
+
       {/* Hero Section */}
       <section className="relative bg-primary text-primary-foreground">
         <div className="container mx-auto px-4 py-24 md:py-32">
@@ -138,8 +141,8 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-end mb-12">
             <div>
-              <h2 className="font-serif text-3xl md:text-4xl font-bold mb-4">Live Catalog</h2>
-              <p className="text-muted-foreground text-lg">Real-time Database Management</p>
+              <h2 className="font-serif text-3xl md:text-4xl font-bold mb-4">Best Sellers</h2>
+              <p className="text-muted-foreground text-lg">Our most popular items this season</p>
             </div>
             {isAdmin && (
               <Button onClick={handleAdd} className="bg-green-600 hover:bg-green-700">
@@ -157,7 +160,7 @@ export default function HomePage() {
 
                 return (
                   <div key={product.id || Math.random()} className="group relative border rounded-lg p-6 hover:shadow-lg transition">
-                    
+
                     {/* --- HEART BUTTON (Now Top Right) --- */}
                     <Button
                       variant="ghost"
@@ -165,10 +168,9 @@ export default function HomePage() {
                       className="absolute top-4 right-4 z-20 bg-white/80 hover:bg-white rounded-full shadow-sm"
                       onClick={() => toggleWishlist(product)}
                     >
-                      <Heart 
-                        className={`h-5 w-5 transition-colors ${
-                          isLiked ? "fill-red-500 text-red-500" : "text-gray-600"
-                        }`} 
+                      <Heart
+                        className={`h-5 w-5 transition-colors ${isLiked ? "fill-red-500 text-red-500" : "text-gray-600"
+                          }`}
                       />
                     </Button>
 
@@ -188,10 +190,10 @@ export default function HomePage() {
                     {product.imageUrl && (
                       <div className="relative w-full h-48 mb-4">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img 
-                          src={product.imageUrl} 
-                          alt={product.name} 
-                          className="w-full h-full object-cover rounded-md" 
+                        <img
+                          src={product.imageUrl}
+                          alt={product.name}
+                          className="w-full h-full object-cover rounded-md"
                         />
                       </div>
                     )}
@@ -199,13 +201,13 @@ export default function HomePage() {
                     <h3 className="text-2xl font-semibold pr-16">{product.name}</h3>
                     <p className="text-lg font-bold text-primary mt-2">${product.price}</p>
                     <p className="text-gray-500 mt-2">{product.description}</p>
-                    
+
                     <div className="mt-4 text-sm font-medium">
-                       {currentStock > 0 ? (
-                         <span className="text-gray-500">In Stock: {currentStock}</span>
-                       ) : (
-                         <span className="text-red-600">Out of Stock</span>
-                       )}
+                      {currentStock > 0 ? (
+                        <span className="text-gray-500">In Stock: {currentStock}</span>
+                      ) : (
+                        <span className="text-red-600">Out of Stock</span>
+                      )}
                     </div>
 
                     {/* DYNAMIC BUTTONS */}
@@ -215,23 +217,23 @@ export default function HomePage() {
                           <Button size="icon" variant="outline" onClick={() => removeFromCart(product.id)}>
                             <Minus className="h-4 w-4" />
                           </Button>
-                          
+
                           <span className="font-bold text-lg flex-1 text-center">{quantityInCart} in Cart</span>
-                          
-                          <Button 
-                            size="icon" 
-                            variant="outline" 
-                            onClick={() => addToCart(product)} 
+
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={() => addToCart(product)}
                             disabled={currentStock <= 0}
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
                         </div>
                       ) : (
-                        <Button 
-                          className="w-full" 
-                          variant="outline" 
-                          onClick={() => addToCart(product)} 
+                        <Button
+                          className="w-full"
+                          variant="outline"
+                          onClick={() => addToCart(product)}
                           disabled={currentStock <= 0}
                         >
                           Add to Cart

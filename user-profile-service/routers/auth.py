@@ -66,6 +66,9 @@ def login(creds: LoginRequest):
     # Check Users
     users = get_ref("users").get() or {}
     for uid, data in users.items():
+        # Skip invalid entries (might be bool or other non-dict types)
+        if not isinstance(data, dict):
+            continue
         if data.get("auth", {}).get("email") == creds.email:
             if verify_password(creds.password, data["auth"]["password"]):
                 token = create_token({"sub": uid, "role": "user"})
@@ -74,6 +77,9 @@ def login(creds: LoginRequest):
     # Check Admins
     admins = get_ref("admins").get() or {}
     for aid, data in admins.items():
+        # Skip invalid entries (might be bool or other non-dict types)
+        if not isinstance(data, dict):
+            continue
         if data.get("auth", {}).get("email") == creds.email:
             if verify_password(creds.password, data["auth"]["password"]):
                 token = create_token({"sub": aid, "role": "admin"})
