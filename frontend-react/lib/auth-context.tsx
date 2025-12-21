@@ -27,6 +27,7 @@ interface AuthContextType {
   updateUser: (updates: Partial<User>) => Promise<boolean>
   isAdmin: boolean
   isAuthenticated: boolean
+  isLoading: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -38,6 +39,7 @@ const ADMIN_PASSWORD = "admin123"
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
   // Load user and token from localStorage on mount
@@ -50,6 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (savedToken) {
       setToken(savedToken)
     }
+    setIsLoading(false)
   }, [])
 
   // Save user to localStorage whenever it changes
@@ -131,6 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateUser,
         isAdmin: user?.isAdmin ?? false,
         isAuthenticated: user !== null,
+        isLoading,
       }}
     >
       {children}

@@ -32,7 +32,7 @@ interface Product {
 }
 
 export default function ProductsPage() {
-  const { isAdmin, isAuthenticated } = useAuth()
+  const { isAdmin, isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -63,12 +63,15 @@ export default function ProductsPage() {
   }
 
   useEffect(() => {
+    // Wait for auth to finish loading before checking auth status
+    if (isLoading) return
+
     if (!isAuthenticated || !isAdmin) {
       router.push("/login")
       return
     }
     fetchProducts()
-  }, [isAuthenticated, isAdmin, router])
+  }, [isLoading, isAuthenticated, isAdmin, router])
 
   const handleOpenDialog = (product?: Product) => {
     if (product) {
@@ -225,10 +228,10 @@ export default function ProductsPage() {
                           <td className="p-4">
                             <span
                               className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${(product.stock || 0) > 10
-                                  ? "bg-green-100 text-green-800"
-                                  : (product.stock || 0) > 0
-                                    ? "bg-orange-100 text-orange-800"
-                                    : "bg-red-100 text-red-800"
+                                ? "bg-green-100 text-green-800"
+                                : (product.stock || 0) > 0
+                                  ? "bg-orange-100 text-orange-800"
+                                  : "bg-red-100 text-red-800"
                                 }`}
                             >
                               {product.stock || 0} units

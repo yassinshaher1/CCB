@@ -8,12 +8,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Package, ShoppingCart, DollarSign, TrendingUp, TrendingDown } from "lucide-react"
 
 export default function AdminDashboard() {
-  const { isAdmin, isAuthenticated } = useAuth()
+  const { isAdmin, isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
   const [orders, setOrders] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
 
   useEffect(() => {
+    // Wait for auth to finish loading before checking auth status
+    if (isLoading) return
+
     if (!isAuthenticated || !isAdmin) {
       router.push("/login")
       return
@@ -32,7 +35,7 @@ export default function AdminDashboard() {
     // Poll for updates every 2 seconds
     const interval = setInterval(loadData, 2000)
     return () => clearInterval(interval)
-  }, [isAuthenticated, isAdmin, router])
+  }, [isLoading, isAuthenticated, isAdmin, router])
 
   if (!isAdmin) return null
 
@@ -123,15 +126,14 @@ export default function AdminDashboard() {
                       <div className="text-right">
                         <p className="font-medium">${order.total.toFixed(2)}</p>
                         <p
-                          className={`text-xs ${
-                            order.status === "Completed"
+                          className={`text-xs ${order.status === "Completed"
                               ? "text-green-500"
                               : order.status === "Processing"
                                 ? "text-blue-500"
                                 : order.status === "Shipped"
                                   ? "text-purple-500"
                                   : "text-orange-500"
-                          }`}
+                            }`}
                         >
                           {order.status}
                         </p>

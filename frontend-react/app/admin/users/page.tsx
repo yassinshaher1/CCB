@@ -39,18 +39,11 @@ interface User {
 }
 
 export default function UsersPage() {
-    const { isAdmin, isAuthenticated } = useAuth()
+    const { isAdmin, isAuthenticated, isLoading, token } = useAuth()
     const router = useRouter()
     const [users, setUsers] = useState<User[]>([])
     const [admins, setAdmins] = useState<User[]>([])
     const [loading, setLoading] = useState(true)
-    const [token, setToken] = useState<string | null>(null)
-
-    // Get token from localStorage on mount
-    useEffect(() => {
-        const storedToken = localStorage.getItem("ccb-token")
-        setToken(storedToken)
-    }, [])
     const [searchQuery, setSearchQuery] = useState("")
     const [activeTab, setActiveTab] = useState<"users" | "admins">("users")
 
@@ -86,12 +79,15 @@ export default function UsersPage() {
     }
 
     useEffect(() => {
+        // Wait for auth to finish loading before checking auth status
+        if (isLoading) return
+
         if (!isAuthenticated || !isAdmin) {
             router.push("/login")
             return
         }
         fetchUsers()
-    }, [isAuthenticated, isAdmin, router, token])
+    }, [isLoading, isAuthenticated, isAdmin, router, token])
 
     const handleOpenEditDialog = (user: User) => {
         setEditingUser(user)
