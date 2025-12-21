@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ccb-dev
+  labels:
+    name: ccb-dev
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ccb-prod
+  labels:
+    name: ccb-prod
