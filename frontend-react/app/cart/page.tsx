@@ -72,7 +72,8 @@ export default function CartPage() {
                 <Card key={`${item.id}-${item.size}-${item.color}`} className="p-4">
                   <div className="flex gap-4">
                     <div className="relative w-24 h-24 bg-muted rounded-md overflow-hidden flex-shrink-0">
-                      <Image src={item.image || "/placeholder.svg"} alt={item.name} fill className="object-cover" />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={item.imageUrl || item.image || "/placeholder.svg"} alt={item.name} className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-lg mb-1">{item.name}</h3>

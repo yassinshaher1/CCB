@@ -312,13 +312,20 @@ export default function ProductsPage() {
               </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="categoryId">Category ID</Label>
-              <Input
+              <Label htmlFor="categoryId">Collection</Label>
+              <select
                 id="categoryId"
                 value={formData.categoryId}
                 onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                placeholder="hoodies, jackets, tshirts, etc."
-              />
+                className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Select a collection...</option>
+                <option value="heritage">Heritage Collection</option>
+                <option value="modern">Modern Essentials</option>
+                <option value="casual">Casual Wear</option>
+                <option value="formal">Formal Collection</option>
+                <option value="accessories">Accessories</option>
+              </select>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="description">Description</Label>

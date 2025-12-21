@@ -335,14 +335,27 @@ export default function CheckoutPage() {
                 <h2 className="font-serif text-xl font-semibold mb-4">Order Summary</h2>
                 <div className="space-y-3 mb-4">
                   {cartItems.map((item, index) => (
-                    <div key={index} className="flex justify-between text-sm">
-                      <div className="flex-1">
-                        <p className="font-medium">
-                          {item.name} × {item.quantity}
-                        </p>
-                        <p className="text-muted-foreground text-xs">Size {item.size}</p>
+                    <div key={index} className="flex gap-3 text-sm">
+                      {/* Product Image */}
+                      {(item.imageUrl || item.image) && (
+                        <div className="w-16 h-16 flex-shrink-0 rounded-md overflow-hidden bg-gray-100">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={item.imageUrl || item.image}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1 flex justify-between">
+                        <div>
+                          <p className="font-medium">
+                            {item.name} × {item.quantity}
+                          </p>
+                          <p className="text-muted-foreground text-xs">Size {item.size}</p>
+                        </div>
+                        <span className="font-medium">${(item.price * item.quantity).toFixed(2)}</span>
                       </div>
-                      <span className="font-medium">${(item.price * item.quantity).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>

@@ -57,31 +57,10 @@ export default function ShopPage() {
           </p>
         </div>
 
-        {/* Category Filter */}
+        {/* All Products Header */}
         <div className="flex flex-wrap gap-3 justify-center mb-12">
-          <Button
-            variant={selectedCategory === "all" ? "default" : "outline"}
-            onClick={() => setSelectedCategory("all")}
-          >
+          <Button variant="default">
             All Products
-          </Button>
-          <Button
-            variant={selectedCategory === "mens" ? "default" : "outline"}
-            onClick={() => setSelectedCategory("mens")}
-          >
-            Men&apos;s
-          </Button>
-          <Button
-            variant={selectedCategory === "womens" ? "default" : "outline"}
-            onClick={() => setSelectedCategory("womens")}
-          >
-            Women&apos;s
-          </Button>
-          <Button
-            variant={selectedCategory === "accessories" ? "default" : "outline"}
-            onClick={() => setSelectedCategory("accessories")}
-          >
-            Accessories
           </Button>
         </div>
 
