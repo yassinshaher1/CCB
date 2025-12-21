@@ -15,6 +15,7 @@ export default function WishlistClient() {
 
   const handleAddToCart = (item: any) => {
     addToCart(item) // Removed hardcoded size/color to match your simple setup
+    removeFromWishlist(item.id) // Remove from wishlist after adding to cart
   }
 
   return (
@@ -58,13 +59,13 @@ export default function WishlistClient() {
                   <CardContent className="p-0">
                     <div className="relative aspect-[3/4] bg-muted">
                       {/* --- FIX: Check for 'imageUrl' OR 'image' --- */}
-                      <Image 
-                        src={item.imageUrl || item.image || "/placeholder.svg"} 
-                        alt={item.name} 
-                        fill 
-                        className="object-cover" 
+                      <Image
+                        src={item.imageUrl || item.image || "/placeholder.svg"}
+                        alt={item.name}
+                        fill
+                        className="object-cover"
                       />
-                      
+
                       <Button
                         size="icon"
                         variant="secondary"

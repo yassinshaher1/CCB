@@ -22,3 +22,7 @@ class LoginRequest(BaseModel):
 class UpdateProfile(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip: Optional[str] = None

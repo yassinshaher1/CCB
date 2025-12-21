@@ -4,7 +4,7 @@ import type React from "react"
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, Package, ShoppingCart, LogOut } from "lucide-react"
+import { Home, Package, ShoppingCart, Users, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
 import Image from "next/image"
@@ -13,6 +13,7 @@ const navigation = [
   { name: "Dashboard", href: "/admin", icon: Home },
   { name: "Products", href: "/admin/products", icon: Package },
   { name: "Orders", href: "/admin/orders", icon: ShoppingCart },
+  { name: "Users", href: "/admin/users", icon: Users },
 ]
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
