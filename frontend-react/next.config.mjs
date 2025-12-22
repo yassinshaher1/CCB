@@ -41,6 +41,15 @@ const nextConfig = {
         source: '/api/order',
         destination: 'http://order-service/order',
       },
+      // Fetch orders routes
+      {
+        source: '/api/orders/:email',
+        destination: 'http://order-service/orders/:email',
+      },
+      {
+        source: '/api/orders',
+        destination: 'http://order-service/orders',
+      },
     ];
   },
 }

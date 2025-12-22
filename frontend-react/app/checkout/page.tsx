@@ -101,18 +101,40 @@ export default function CheckoutPage() {
       shippingAddress: `${formData.address}${formData.apartment ? `, ${formData.apartment}` : ""}, ${formData.city}, ${formData.state} ${formData.zip}`,
     }
 
-    // Backend payload
-    const payload = {
+    // Send full order data to backend for persistence across devices
+    const backendOrderData = {
       userId: formData.email || "guest",
+      customerEmail: formData.email,
+      customerName: `${formData.firstName} ${formData.lastName}`,
       cartItems: cartItems.reduce((acc, item) => {
         acc[item.id] = {
           quantity: item.quantity,
           price: item.price,
-          name: item.name
+          name: item.name,
+          size: item.size,
+          color: item.color,
+          image: item.imageUrl || item.image
         };
         return acc;
       }, {} as Record<string, any>),
-      totalPrice: total
+      items: cartItems.map((item) => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        size: item.size,
+        color: item.color,
+        image: item.imageUrl || item.image,
+      })),
+      subtotal,
+      shipping,
+      tax,
+      totalPrice: total,
+      total,
+      status: "Pending",
+      date: new Date().toISOString().split("T")[0],
+      shippingAddress: `${formData.address}${formData.apartment ? `, ${formData.apartment}` : ""}, ${formData.city}, ${formData.state} ${formData.zip}`,
+      orderNumber: Math.floor(100000 + Math.random() * 900000),
     }
 
     try {
@@ -121,7 +143,7 @@ export default function CheckoutPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(backendOrderData),
       });
 
       if (!response.ok) {
@@ -141,7 +163,7 @@ export default function CheckoutPage() {
     // Save to session storage for receipt page
     sessionStorage.setItem("lastOrder", JSON.stringify(orderDetails))
 
-    // Save to admin orders in localStorage
+    // Also save to localStorage as fallback for offline/demo mode
     const existingOrders = JSON.parse(localStorage.getItem("ccb-admin-orders") || "[]")
     localStorage.setItem("ccb-admin-orders", JSON.stringify([orderDetails, ...existingOrders]))
 

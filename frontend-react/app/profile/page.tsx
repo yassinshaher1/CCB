@@ -75,15 +75,77 @@ export default function ProfilePage() {
     zip: "",
   })
 
-  // Load orders from localStorage
+  // Fetch orders from backend API (enables cross-device sync)
   useEffect(() => {
+    const fetchOrders = async () => {
+      if (!user) return;
+
+      try {
+        // Fetch orders from backend API
+        const response = await fetch(`/api/orders/${encodeURIComponent(user.email)}`);
+        if (response.ok) {
+          const backendOrders = await response.json();
+          if (Array.isArray(backendOrders)) {
+            // Normalize backend data to match UI expectations
+            const normalizedOrders = backendOrders.map((order: any) => {
+              // Convert items from object format to array format if needed
+              let itemsArray: OrderItem[] = [];
+              if (order.items) {
+                if (Array.isArray(order.items)) {
+                  // Already an array (new format)
+                  itemsArray = order.items.filter((item: any) => item != null);
+                } else if (typeof order.items === 'object') {
+                  // Object format (old format) - convert to array
+                  itemsArray = Object.values(order.items).map((item: any) => ({
+                    name: item?.name || 'Unknown Item',
+                    quantity: item?.quantity || 1,
+                    price: item?.price || 0,
+                    size: item?.size,
+                    color: item?.color,
+                  }));
+                }
+              }
+
+              return {
+                id: order.id,
+                orderNumber: order.orderNumber || parseInt(order.id?.replace(/\D/g, '').slice(-6) || '0') || Date.now(),
+                customerEmail: order.customerEmail || order.userId,
+                customerName: order.customerName || 'Guest',
+                total: order.total || order.totalPrice || 0,
+                subtotal: order.subtotal || (order.total || order.totalPrice || 0) * 0.9,
+                shipping: order.shipping || 0,
+                tax: order.tax || (order.total || order.totalPrice || 0) * 0.0635,
+                status: order.status || 'Pending',
+                date: order.date || (order.createdAt ? order.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]),
+                shippingAddress: order.shippingAddress || '',
+                items: itemsArray,
+              } as Order;
+            });
+            setOrders(normalizedOrders);
+          }
+        } else {
+          // Fallback to localStorage if API fails
+          console.warn("Could not fetch orders from API, using localStorage fallback");
+          const allOrders = JSON.parse(localStorage.getItem("ccb-admin-orders") || "[]");
+          const userOrders = allOrders.filter(
+            (order: Order) => order.customerEmail === user.email
+          );
+          setOrders(userOrders);
+        }
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+        // Fallback to localStorage
+        const allOrders = JSON.parse(localStorage.getItem("ccb-admin-orders") || "[]");
+        const userOrders = allOrders.filter(
+          (order: Order) => order.customerEmail === user.email
+        );
+        setOrders(userOrders);
+      }
+    };
+
     if (user) {
-      const allOrders = JSON.parse(localStorage.getItem("ccb-admin-orders") || "[]")
-      // Filter orders for current user
-      const userOrders = allOrders.filter(
-        (order: Order) => order.customerEmail === user.email
-      )
-      setOrders(userOrders)
+      // Fetch orders from backend
+      fetchOrders();
 
       // Initialize edit form with user data
       setEditForm({
