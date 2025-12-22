@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+serviceAccountKey.json
+shared-assets/serviceAccountKey.json
+order-service/serviceAccountKey.json

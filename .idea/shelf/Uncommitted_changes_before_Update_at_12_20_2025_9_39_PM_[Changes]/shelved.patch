@@ -1,0 +1,1164 @@
+Index: payment-service/main.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import threading\r\nimport time\r\nimport sys\r\nimport os\r\nfrom datetime import datetime\r\n\r\nshared_assets_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'shared-assets')\r\nsys.path.append(shared_assets_path)\r\nfrom firebase_config import get_db\r\n\r\ndb = get_db()\r\n\r\ndef process_order(doc_id, order_data):\r\n\r\n    print(f\"\\n[EVENT DETECTED] New Order Found: {doc_id}\")\r\n    print(f\"   └── User: {order_data.get('userId')} | Amount: ${order_data.get('totalPrice')}\")\r\n    \r\n    # 1. Simulate Processing Delay (e.g., talking to Bank API)\r\n    print(\"   └── \uD83D\uDCB3 Contacting Payment Gateway...\")\r\n    time.sleep(3)\r\n    \r\n    db.collection('orders').document(doc_id).update({\r\n        'status': 'PAID',\r\n        'updatedAt': datetime.now().isoformat()\r\n    })\r\n    print(f\"   └── ✅ SUCCESS: Order {doc_id} marked as PAID.\")\r\n\r\ndef on_snapshot(col_snapshot, changes, read_time):\r\n\r\n    for change in changes:\r\n        if change.type.name == 'ADDED':\r\n            data = change.document.to_dict()\r\n            if data.get('status') == 'PENDING':\r\n                thread = threading.Thread(target=process_order, args=(change.document.id, data))\r\n                thread.start()\r\n\r\nif __name__ == \"__main__\":\r\n    print(\"------------------------------------------------\")\r\n    print(\"PAYMENT SERVICE (EVENT LISTENER) STARTED\")\r\n    print(\" Watching 'orders' collection for events...\")\r\n    print(\"------------------------------------------------\")\r\n    \r\n    order_ref = db.collection('orders')\r\n    query_watch = order_ref.on_snapshot(on_snapshot)\r\n\r\n    while True:\r\n        time.sleep(1)\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/payment-service/main.py b/payment-service/main.py
+--- a/payment-service/main.py	(revision 48aefcffbc575c0047019e8b482f06e5ba7207c5)
++++ b/payment-service/main.py	(date 1766259567763)
+@@ -1,47 +1,98 @@
+-import threading
+ import time
+-import sys
+-import os
++import threading
+ from datetime import datetime
++import sys, os
+ 
+-shared_assets_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'shared-assets')
++# Add shared-assets to path
++shared_assets_path = os.path.join(
++    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
++    "shared-assets"
++)
+ sys.path.append(shared_assets_path)
++
+ from firebase_config import get_db
+ 
++# Get Realtime Database root reference
+ db = get_db()
+ 
+-def process_order(doc_id, order_data):
++
++def process_payment(order_id, order_data):
++    """
++    Handles payment logic for a single order.
++    Runs in a separate thread.
++    """
+ 
+-    print(f"\n[EVENT DETECTED] New Order Found: {doc_id}")
+-    print(f"   └── User: {order_data.get('userId')} | Amount: ${order_data.get('totalPrice')}")
+-    
+-    # 1. Simulate Processing Delay (e.g., talking to Bank API)
+-    print("   └── 💳 Contacting Payment Gateway...")
++    # Safety check (idempotency)
++    if order_data.get("status") != "PENDING":
++        return
++
++    print(f"\n[EVENT] Processing payment for order: {order_id}")
++
++    # Simulate payment gateway delay
++    print(" Contacting payment gateway...")
+     time.sleep(3)
+-    
+-    db.collection('orders').document(doc_id).update({
+-        'status': 'PAID',
+-        'updatedAt': datetime.now().isoformat()
++
++    # 1 Create payment record
++    payment_data = {
++        "orderId": order_id,
++        "method": "VISA",
++        "status": "SUCCESS",
++        "amount": order_data.get("totalPrice"),
++        "currency": "USD",
++        "createdAt": datetime.now().isoformat()
++    }
++
++    payment_ref = db.child("payments").push(payment_data)
++    payment_id = payment_ref.key
++
++    # 2 Update order
++    db.child("orders").child(order_id).update({
++        "status": "PAID",
++        "paymentStatus": "SUCCESS",
++        "paymentId": payment_id,
++        "updatedAt": datetime.now().isoformat()
+     })
+-    print(f"   └── ✅ SUCCESS: Order {doc_id} marked as PAID.")
++
++    print(f" Order {order_id} marked as PAID")
++    print(f" Payment record created: {payment_id}")
++
++
++def order_listener(event):
++    """
++    Firebase Realtime Database listener.
++    Fires when orders change.
++    """
++
++    # We only care about new orders
++    if event.event_type != "put":
++        return
++
++    if not event.path or event.path == "/":
++        return
+ 
+-def on_snapshot(col_snapshot, changes, read_time):
++    order_id = event.path.lstrip("/")
++    order_data = event.data
+ 
+-    for change in changes:
+-        if change.type.name == 'ADDED':
+-            data = change.document.to_dict()
+-            if data.get('status') == 'PENDING':
+-                thread = threading.Thread(target=process_order, args=(change.document.id, data))
+-                thread.start()
++    if not isinstance(order_data, dict):
++        return
++
++    if order_data.get("status") == "PENDING":
++        thread = threading.Thread(
++            target=process_payment,
++            args=(order_id, order_data)
++        )
++        thread.start()
+ 
++
+ if __name__ == "__main__":
+     print("------------------------------------------------")
+-    print("PAYMENT SERVICE (EVENT LISTENER) STARTED")
+-    print(" Watching 'orders' collection for events...")
++    print(" PAYMENT SERVICE STARTED")
++    print(" Listening for PENDING orders...")
+     print("------------------------------------------------")
+-    
+-    order_ref = db.collection('orders')
+-    query_watch = order_ref.on_snapshot(on_snapshot)
++
++    orders_ref = db.child("orders")
++    orders_ref.listen(order_listener)
+ 
++    # Keep process alive
+     while True:
+         time.sleep(1)
+Index: shared-assets/firebase_config.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import firebase_admin\r\nfrom firebase_admin import credentials, db\r\nimport os\r\n\r\nSERVICE_ACCOUNT_PATH = os.path.join(os.path.dirname(__file__), \"serviceAccountKey.json\")\r\nDATABASE_URL = \"https://ccb-db-41f73-default-rtdb.firebaseio.com\"\r\n\r\nif not firebase_admin._apps:\r\n    cred = credentials.Certificate(SERVICE_ACCOUNT_PATH)\r\n    firebase_admin.initialize_app(cred, {\r\n        \"databaseURL\": DATABASE_URL\r\n    })\r\n\r\ndef get_db_ref(path: str):\r\n    return db.reference(path)\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/shared-assets/firebase_config.py b/shared-assets/firebase_config.py
+--- a/shared-assets/firebase_config.py	(revision 48aefcffbc575c0047019e8b482f06e5ba7207c5)
++++ b/shared-assets/firebase_config.py	(date 1766259457760)
+@@ -11,5 +11,5 @@
+         "databaseURL": DATABASE_URL
+     })
+ 
+-def get_db_ref(path: str):
+-    return db.reference(path)
++def get_db():
++    return db.reference()
+Index: payment-service/requirements.txt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>firebase-admin\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/payment-service/requirements.txt b/payment-service/requirements.txt
+--- a/payment-service/requirements.txt	(revision 48aefcffbc575c0047019e8b482f06e5ba7207c5)
++++ b/payment-service/requirements.txt	(date 1766259520445)
+@@ -1,1 +1,1 @@
+-firebase-admin
++firebase-admin
+\ No newline at end of file
+Index: order-service/app.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/order-service/app.py b/order-service/app.py
+--- a/order-service/app.py	(revision 48aefcffbc575c0047019e8b482f06e5ba7207c5)
++++ b/order-service/app.py	(date 1766259457754)
+@@ -1,0 +1,47 @@
++from fastapi import FastAPI
++from pydantic import BaseModel
++from datetime import datetime
++import sys, os
++from fastapi.middleware.cors import CORSMiddleware
++
++# Add shared-assets to path specially because it has a hyphen
++shared_assets_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared-assets")
++sys.path.append(shared_assets_path)
++from firebase_config import get_db
++
++app = FastAPI()
++
++app.add_middleware(
++    CORSMiddleware,
++    allow_origins=["*"],
++    allow_methods=["*"],
++    allow_headers=["*"],
++)
++
++db = get_db()
++
++class OrderRequest(BaseModel):
++    userId: str
++    cartItems: dict
++    totalPrice: float
++
++@app.post("/order")
++def create_order(order: OrderRequest):
++    order_data = {
++        "userId": order.userId,
++        "status": "PENDING",   
++        "totalPrice": order.totalPrice,
++        "items": order.cartItems,
++        "createdAt": datetime.now().isoformat(),
++        "updatedAt": datetime.now().isoformat(),
++        "paymentId": ""
++    }
++
++    # Realtime Database: db.child("orders").push(data)
++    # db is now a Reference object (root) because we returned db.reference()
++    new_order_ref = db.child("orders").push(order_data)
++
++    return {
++        "message": "Order received! Processing payment...",
++        "orderId": new_order_ref.key
++    }
+Index: frontend-react/lib/api.ts
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/frontend-react/lib/api.ts b/frontend-react/lib/api.ts
+new file mode 100644
+--- /dev/null	(date 1766259457730)
++++ b/frontend-react/lib/api.ts	(date 1766259457730)
+@@ -0,0 +1,39 @@
++const BASE_URL = "http://localhost:8000";
++
++export const api = {
++    async signup(type: 'user' | 'admin', data: any) {
++        const res = await fetch(`${BASE_URL}/auth/signup/${type}`, {
++            method: "POST",
++            headers: { "Content-Type": "application/json" },
++            body: JSON.stringify(data),
++        });
++        if (!res.ok) {
++            const error = await res.json();
++            throw new Error(error.detail || "Signup failed");
++        }
++        return res.json();
++    },
++
++    async login(data: any) {
++        const res = await fetch(`${BASE_URL}/auth/login`, {
++            method: "POST",
++            headers: { "Content-Type": "application/json" },
++            body: JSON.stringify(data),
++        });
++        if (!res.ok) {
++            const error = await res.json();
++            throw new Error(error.detail || "Login failed");
++        }
++        return res.json();
++    },
++
++    async getProfile(token: string) {
++        const res = await fetch(`${BASE_URL}/profile/me`, {
++            headers: {
++                "Authorization": `Bearer ${token}`
++            },
++        });
++        if (!res.ok) throw new Error("Failed to fetch profile");
++        return res.json();
++    }
++};
+Index: order-service/CCB.json
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/order-service/CCB.json b/order-service/CCB.json
+new file mode 100644
+--- /dev/null	(date 1766259457730)
++++ b/order-service/CCB.json	(date 1766259457730)
+@@ -0,0 +1,130 @@
++{
++  "users": {
++    "{userId}": {
++      "auth": {
++        "email": "",
++        "password": "",
++        "lastLoginAt": "",
++        "createdAt": ""
++      },
++
++      "profile": {
++        "name": "",
++        "phone": "",
++        "role": "user",
++        "status": "active"
++      },
++
++      "cart": {
++        "{productId}": {
++          "productId": "",
++          "quantity": 0,
++          "price": 0
++        }
++      },
++
++      "wishlist": {
++        "{productId}": true
++      }
++    }
++  },
++
++  "admins": {
++    "{adminId}": {
++      "auth": {
++        "email": "",
++        "password": "",
++        "lastLoginAt": "",
++        "createdAt": ""
++      },
++
++      "profile": {
++        "name": "",
++        "role": "admin",
++        "status": "active"
++      },
++
++      "permissions": {
++        "catalogueService": true,
++        "orderService": true,
++        "paymentService": true,
++        "userManagementService": true
++      }
++    }
++  },
++
++  "products": {
++    "{productId}": {
++      "name": "",
++      "categoryId": "",
++      "price": 0,
++      "stock": 0,
++      "description": "",
++      "images": {
++        "{imageId}": ""
++      },
++      "isActive": true,
++      "createdAt": "",
++      "updatedAt": ""
++    }
++  },
++
++  "categories": {
++    "{categoryId}": {
++      "name": "",
++      "description": "",
++      "createdAt": ""
++    }
++  },
++
++  "orders": {
++    "{orderId}": {
++      "userId": "",
++      "status": "",
++      "totalPrice": 0,
++      "createdAt": "",
++      "updatedAt": "",
++      "items": {
++        "{productId}": {
++          "quantity": 0,
++          "price": 0
++        }
++      },
++      "paymentId": ""
++    }
++  },
++
++  "payments": {
++    "{paymentId}": {
++      "orderId": "",
++      "method": "",
++      "status": "",
++      "amount": 0,
++      "currency": "",
++      "createdAt": ""
++    }
++  },
++
++  "system": {
++    "services": {
++      "authService": {
++        "enabled": true
++      },
++      "catalogueService": {
++        "enabled": true
++      },
++      "cartService": {
++        "enabled": true
++      },
++      "wishlistService": {
++        "enabled": true
++      },
++      "orderService": {
++        "enabled": true
++      },
++      "paymentService": {
++        "enabled": true
++      }
++    }
++  }
++}
+Index: frontend-react/public/products.json
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/frontend-react/public/products.json b/frontend-react/public/products.json
+new file mode 100644
+--- /dev/null	(date 1766259457730)
++++ b/frontend-react/public/products.json	(date 1766259457730)
+@@ -0,0 +1,52 @@
++[
++  { "id": "prod_01", "name": "Classic Navy Blazer", "price": 120.00, "image": "/navy-blazer.png" },
++  { "id": "prod_02", "name": "White Oxford Shirt", "price": 45.00, "image": "/white-oxford-shirt.png" },
++  { "id": "prod_03", "name": "Khaki Chinos", "price": 55.00, "image": "/khaki-chinos.jpg" },
++  { "id": "prod_04", "name": "Navy Wool Coat", "price": 180.00, "image": "/navy-wool-coat.jpg" },
++  { "id": "prod_05", "name": "Brown Leather Boots", "price": 110.00, "image": "/brown-leather-brogue-shoes.jpg" },
++  { "id": "prod_06", "name": "Modern Bomber Jacket", "price": 85.00, "image": "/modern-bomber-jacket-navy.jpg" },
++  { "id": "prod_07", "name": "White Polo Shirt", "price": 35.00, "image": "/white-polo-shirt.png" },
++  { "id": "prod_08", "name": "Navy Wool Scarf", "price": 45.00, "image": "/navy-wool-scarf.jpg" },
++  { "id": "prod_09", "name": "Brown Leather Handbag", "price": 120.00, "image": "/brown-leather-handbag.jpg" },
++  { "id": "prod_10", "name": "Navy Dress Pants", "price": 70.00, "image": "/navy-dress-pants.jpg" },
++  { "id": "prod_11", "name": "Beige Trench Coat", "price": 150.00, "image": "/beige-trench-coat-classic.jpg" },
++  { "id": "prod_12", "name": "Black Turtleneck", "price": 60.00, "image": "/black-turtleneck-modern.jpg" },
++  { "id": "prod_13", "name": "Silk Tie (Navy)", "price": 30.00, "image": "/silk-tie-navy-pattern.jpg" },
++  { "id": "prod_14", "name": "Navy Cashmere Sweater", "price": 95.00, "image": "/navy-cashmere-sweater.jpg" },
++  { "id": "prod_15", "name": "Classic Sunglasses", "price": 15.00, "image": "/classic-sunglasses.png" },
++  { "id": "prod_16", "name": "Wool Vest", "price": 65.00, "image": "/wool-vest-vintage-brown.jpg" },
++  { "id": "prod_17", "name": "Wireless Headphones", "price": 85.00, "image": "/wireless-headphones.png" },
++  { "id": "prod_18", "name": "Smartwatch", "price": 200.00, "image": "/smartwatch-lifestyle.png" },
++  { "id": "prod_19", "name": "Gaming Keyboard", "price": 50.00, "image": "/gaming-keyboard.png" },
++  { "id": "prod_20", "name": "Wireless Earbuds", "price": 45.00, "image": "/wireless-earbuds-charging-case.png" },
++  { "id": "prod_21", "name": "USB Hub", "price": 25.00, "image": "/usb-hub.png" },
++  { "id": "prod_22", "name": "Modern Chinos (Tech)", "price": 60.00, "image": "/modern-chinos-navy-tech-fabric.jpg" },
++  { "id": "prod_23", "name": "Brown Leather Belt", "price": 35.00, "image": "/brown-leather-belt.png" },
++  { "id": "prod_24", "name": "Elegant Midi Dress", "price": 90.00, "image": "/elegant-navy-midi-dress.jpg" },
++  { "id": "prod_25", "name": "Classic White Shirt", "price": 40.00, "image": "/white-oxford-shirt-classic.jpg" },
++  { "id": "prod_26", "name": "Patterned Scarf", "price": 25.00, "image": "/fashion-accessories-scarves-bags.jpg" },
++  { "id": "prod_27", "name": "Bluetooth Speaker", "price": 55.00, "image": "/bluetooth-speaker.jpg" },
++  { "id": "prod_28", "name": "Canvas Sneakers", "price": 55.00, "image": "/placeholder.jpg" },
++  { "id": "prod_29", "name": "Cable Knit Cardigan", "price": 75.00, "image": "/placeholder.jpg" },
++  { "id": "prod_30", "name": "V-Neck T-Shirt", "price": 22.00, "image": "/placeholder.jpg" },
++  { "id": "prod_31", "name": "Swim Trunks", "price": 38.00, "image": "/placeholder.jpg" },
++  { "id": "prod_32", "name": "Straw Fedora", "price": 30.00, "image": "/placeholder.jpg" },
++  { "id": "prod_33", "name": "Flannel Shirt", "price": 42.00, "image": "/placeholder.jpg" },
++  { "id": "prod_34", "name": "Rain Boots", "price": 65.00, "image": "/placeholder.jpg" },
++  { "id": "prod_35", "name": "Duffel Bag", "price": 120.00, "image": "/placeholder.jpg" },
++  { "id": "prod_36", "name": "Puffer Coat", "price": 130.00, "image": "/placeholder.jpg" },
++  { "id": "prod_37", "name": "Leather Jacket", "price": 250.00, "image": "/placeholder.jpg" },
++  { "id": "prod_38", "name": "Turtleneck Top", "price": 48.00, "image": "/placeholder.jpg" },
++  { "id": "prod_39", "name": "Workout Leggings", "price": 45.00, "image": "/placeholder.jpg" },
++  { "id": "prod_40", "name": "Gym Shorts", "price": 30.00, "image": "/placeholder.jpg" },
++  { "id": "prod_41", "name": "Ankle Socks (6-pack)", "price": 18.00, "image": "/placeholder.jpg" },
++  { "id": "prod_42", "name": "Knit Polo", "price": 52.00, "image": "/placeholder.jpg" },
++  { "id": "prod_43", "name": "Tracksuit Bottoms", "price": 55.00, "image": "/placeholder.jpg" },
++  { "id": "prod_44", "name": "Windbreaker", "price": 70.00, "image": "/placeholder.jpg" },
++  { "id": "prod_45", "name": "Slippers", "price": 25.00, "image": "/placeholder.jpg" },
++  { "id": "prod_46", "name": "Bathrobe", "price": 60.00, "image": "/placeholder.jpg" },
++  { "id": "prod_47", "name": "Suspenders", "price": 20.00, "image": "/placeholder.jpg" },
++  { "id": "prod_48", "name": "Pocket Square", "price": 12.00, "image": "/placeholder.jpg" },
++  { "id": "prod_49", "name": "Work Apron", "price": 35.00, "image": "/placeholder.jpg" },
++  { "id": "prod_50", "name": "Digital Gift Card", "price": 50.00, "image": "/placeholder-logo.svg" }
++]
+\ No newline at end of file
+Index: order-service/Dockerfile
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/order-service/Dockerfile b/order-service/Dockerfile
+new file mode 100644
+--- /dev/null	(date 1766259457744)
++++ b/order-service/Dockerfile	(date 1766259457744)
+@@ -0,0 +1,14 @@
++# Use the version required by the Command Manual 
++FROM python:3.9
++
++# Set the directory where your code will live in the container
++WORKDIR /app
++
++# Copy your local files (app.py, requirements.txt, etc.) into the container [cite: 91]
++COPY . /app
++
++# Install the necessary libraries [cite: 92]
++RUN pip install fastapi uvicorn kafka-python
++
++# The command to start your Order Service [cite: 95]
++CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+\ No newline at end of file
+Index: frontend-react/app/checkout/page.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>\"use client\"\r\nimport { Header } from \"@/components/header\"\r\nimport { Button } from \"@/components/ui/button\"\r\nimport { Card } from \"@/components/ui/card\"\r\nimport { Input } from \"@/components/ui/input\"\r\nimport { Label } from \"@/components/ui/label\"\r\nimport { Separator } from \"@/components/ui/separator\"\r\nimport { RadioGroup, RadioGroupItem } from \"@/components/ui/radio-group\"\r\nimport { Checkbox } from \"@/components/ui/checkbox\"\r\nimport { Lock, CreditCard } from \"lucide-react\"\r\nimport Image from \"next/image\"\r\nimport { useState } from \"react\"\r\nimport { useStore } from \"@/lib/store-context\"\r\nimport { useRouter } from \"next/navigation\"\r\n\r\nexport default function CheckoutPage() {\r\n  const [paymentMethod, setPaymentMethod] = useState(\"card\")\r\n  const [formData, setFormData] = useState({\r\n    email: \"\",\r\n    firstName: \"\",\r\n    lastName: \"\",\r\n    address: \"\",\r\n    apartment: \"\",\r\n    city: \"\",\r\n    state: \"CT\",\r\n    zip: \"\",\r\n  })\r\n  const { cart, clearCart } = useStore()\r\n  const router = useRouter()\r\n  const cartItems = cart\r\n\r\n  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)\r\n  const shipping = subtotal > 100 ? 0 : 15\r\n  const tax = subtotal * 0.0635\r\n  const total = subtotal + shipping + tax\r\n\r\n  const handleCompleteOrder = () => {\r\n    const orderDetails = {\r\n      id: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,\r\n      orderNumber: Math.floor(100000 + Math.random() * 900000),\r\n      customerName: `${formData.firstName} ${formData.lastName}`,\r\n      customerEmail: formData.email,\r\n      items: cartItems.map((item) => ({\r\n        name: item.name,\r\n        quantity: item.quantity,\r\n        price: item.price,\r\n        size: item.size,\r\n        color: item.color,\r\n      })),\r\n      subtotal,\r\n      shipping,\r\n      tax,\r\n      total,\r\n      status: \"Pending\" as const,\r\n      date: new Date().toISOString().split(\"T\")[0],\r\n      shippingAddress: `${formData.address}${formData.apartment ? `, ${formData.apartment}` : \"\"}, ${formData.city}, ${formData.state} ${formData.zip}`,\r\n    }\r\n\r\n    // Save to session storage for receipt page\r\n    sessionStorage.setItem(\"lastOrder\", JSON.stringify(orderDetails))\r\n\r\n    // Save to admin orders in localStorage\r\n    const existingOrders = JSON.parse(localStorage.getItem(\"ccb-admin-orders\") || \"[]\")\r\n    localStorage.setItem(\"ccb-admin-orders\", JSON.stringify([orderDetails, ...existingOrders]))\r\n\r\n    // Clear cart\r\n    clearCart()\r\n\r\n    // Redirect to receipt page\r\n    router.push(\"/order-confirmation\")\r\n  }\r\n\r\n  return (\r\n    <div className=\"min-h-screen bg-background\">\r\n      <Header />\r\n\r\n      <div className=\"container mx-auto px-4 py-8\">\r\n        <div className=\"max-w-6xl mx-auto\">\r\n          <div className=\"flex items-center gap-2 mb-8\">\r\n            <Lock className=\"h-5 w-5 text-primary\" />\r\n            <h1 className=\"font-serif text-3xl md:text-4xl font-bold\">Secure Checkout</h1>\r\n          </div>\r\n\r\n          <div className=\"grid lg:grid-cols-3 gap-8\">\r\n            {/* Checkout Form */}\r\n            <div className=\"lg:col-span-2 space-y-6\">\r\n              {/* Contact Information */}\r\n              <Card className=\"p-6\">\r\n                <h2 className=\"font-semibold text-xl mb-4\">Contact Information</h2>\r\n                <div className=\"space-y-4\">\r\n                  <div>\r\n                    <Label htmlFor=\"email\">Email</Label>\r\n                    <Input\r\n                      id=\"email\"\r\n                      type=\"email\"\r\n                      placeholder=\"you@example.com\"\r\n                      value={formData.email}\r\n                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}\r\n                    />\r\n                  </div>\r\n                  <div className=\"flex items-center gap-2\">\r\n                    <Checkbox id=\"newsletter\" />\r\n                    <Label htmlFor=\"newsletter\" className=\"text-sm font-normal\">\r\n                      Email me with news and offers\r\n                    </Label>\r\n                  </div>\r\n                </div>\r\n              </Card>\r\n\r\n              {/* Shipping Address */}\r\n              <Card className=\"p-6\">\r\n                <h2 className=\"font-semibold text-xl mb-4\">Shipping Address</h2>\r\n                <div className=\"space-y-4\">\r\n                  <div className=\"grid md:grid-cols-2 gap-4\">\r\n                    <div>\r\n                      <Label htmlFor=\"firstName\">First Name</Label>\r\n                      <Input\r\n                        id=\"firstName\"\r\n                        placeholder=\"John\"\r\n                        value={formData.firstName}\r\n                        onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}\r\n                      />\r\n                    </div>\r\n                    <div>\r\n                      <Label htmlFor=\"lastName\">Last Name</Label>\r\n                      <Input\r\n                        id=\"lastName\"\r\n                        placeholder=\"Doe\"\r\n                        value={formData.lastName}\r\n                        onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}\r\n                      />\r\n                    </div>\r\n                  </div>\r\n                  <div>\r\n                    <Label htmlFor=\"address\">Address</Label>\r\n                    <Input\r\n                      id=\"address\"\r\n                      placeholder=\"123 Main Street\"\r\n                      value={formData.address}\r\n                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}\r\n                    />\r\n                  </div>\r\n                  <div>\r\n                    <Label htmlFor=\"apartment\">Apartment, suite, etc. (optional)</Label>\r\n                    <Input\r\n                      id=\"apartment\"\r\n                      placeholder=\"Apt 4B\"\r\n                      value={formData.apartment}\r\n                      onChange={(e) => setFormData({ ...formData, apartment: e.target.value })}\r\n                    />\r\n                  </div>\r\n                  <div className=\"grid md:grid-cols-3 gap-4\">\r\n                    <div>\r\n                      <Label htmlFor=\"city\">City</Label>\r\n                      <Input\r\n                        id=\"city\"\r\n                        placeholder=\"Hartford\"\r\n                        value={formData.city}\r\n                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}\r\n                      />\r\n                    </div>\r\n                    <div>\r\n                      <Label htmlFor=\"state\">State</Label>\r\n                      <Input\r\n                        id=\"state\"\r\n                        placeholder=\"CT\"\r\n                        value={formData.state}\r\n                        onChange={(e) => setFormData({ ...formData, state: e.target.value })}\r\n                      />\r\n                    </div>\r\n                    <div>\r\n                      <Label htmlFor=\"zip\">ZIP Code</Label>\r\n                      <Input\r\n                        id=\"zip\"\r\n                        placeholder=\"06101\"\r\n                        value={formData.zip}\r\n                        onChange={(e) => setFormData({ ...formData, zip: e.target.value })}\r\n                      />\r\n                    </div>\r\n                  </div>\r\n                </div>\r\n              </Card>\r\n\r\n              {/* Payment Method */}\r\n              <Card className=\"p-6\">\r\n                <h2 className=\"font-semibold text-xl mb-4\">Payment Method</h2>\r\n                <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className=\"space-y-3 mb-4\">\r\n                  <div className=\"flex items-center space-x-2 p-3 border rounded-md\">\r\n                    <RadioGroupItem value=\"card\" id=\"card\" />\r\n                    <Label htmlFor=\"card\" className=\"flex-1 cursor-pointer flex items-center gap-2\">\r\n                      <CreditCard className=\"h-4 w-4\" />\r\n                      Credit / Debit Card\r\n                    </Label>\r\n                  </div>\r\n                  <div className=\"flex items-center space-x-2 p-3 border rounded-md\">\r\n                    <RadioGroupItem value=\"paypal\" id=\"paypal\" />\r\n                    <Label htmlFor=\"paypal\" className=\"flex-1 cursor-pointer\">\r\n                      PayPal\r\n                    </Label>\r\n                  </div>\r\n                </RadioGroup>\r\n\r\n                {paymentMethod === \"card\" && (\r\n                  <div className=\"space-y-4\">\r\n                    <div>\r\n                      <Label htmlFor=\"cardNumber\">Card Number</Label>\r\n                      <Input id=\"cardNumber\" placeholder=\"1234 5678 9012 3456\" />\r\n                    </div>\r\n                    <div className=\"grid grid-cols-3 gap-4\">\r\n                      <div className=\"col-span-2\">\r\n                        <Label htmlFor=\"expiry\">Expiry Date</Label>\r\n                        <Input id=\"expiry\" placeholder=\"MM / YY\" />\r\n                      </div>\r\n                      <div>\r\n                        <Label htmlFor=\"cvc\">CVC</Label>\r\n                        <Input id=\"cvc\" placeholder=\"123\" />\r\n                      </div>\r\n                    </div>\r\n                  </div>\r\n                )}\r\n              </Card>\r\n\r\n              <Button size=\"lg\" className=\"w-full\" onClick={handleCompleteOrder}>\r\n                Complete Order\r\n              </Button>\r\n            </div>\r\n\r\n            {/* Order Summary */}\r\n            <div className=\"lg:col-span-1\">\r\n              <Card className=\"p-6 sticky top-20\">\r\n                <h2 className=\"font-serif text-xl font-semibold mb-4\">Order Summary</h2>\r\n                <div className=\"space-y-3 mb-4\">\r\n                  {cartItems.map((item, index) => (\r\n                    <div key={index} className=\"flex justify-between text-sm\">\r\n                      <div className=\"flex-1\">\r\n                        <p className=\"font-medium\">\r\n                          {item.name} × {item.quantity}\r\n                        </p>\r\n                        <p className=\"text-muted-foreground text-xs\">Size {item.size}</p>\r\n                      </div>\r\n                      <span className=\"font-medium\">${(item.price * item.quantity).toFixed(2)}</span>\r\n                    </div>\r\n                  ))}\r\n                </div>\r\n                <Separator className=\"my-4\" />\r\n                <div className=\"space-y-3 mb-4\">\r\n                  <div className=\"flex justify-between text-sm\">\r\n                    <span className=\"text-muted-foreground\">Subtotal</span>\r\n                    <span className=\"font-medium\">${subtotal.toFixed(2)}</span>\r\n                  </div>\r\n                  <div className=\"flex justify-between text-sm\">\r\n                    <span className=\"text-muted-foreground\">Shipping</span>\r\n                    <span className=\"font-medium text-green-600\">\r\n                      {shipping === 0 ? \"Free\" : `$${shipping.toFixed(2)}`}\r\n                    </span>\r\n                  </div>\r\n                  <div className=\"flex justify-between text-sm\">\r\n                    <span className=\"text-muted-foreground\">Tax (CT 6.35%)</span>\r\n                    <span className=\"font-medium\">${tax.toFixed(2)}</span>\r\n                  </div>\r\n                  <Separator />\r\n                  <div className=\"flex justify-between text-lg font-semibold\">\r\n                    <span>Total</span>\r\n                    <span>${total.toFixed(2)}</span>\r\n                  </div>\r\n                </div>\r\n                <div className=\"flex items-center gap-2 p-3 bg-secondary/50 rounded-md text-xs text-muted-foreground\">\r\n                  <Lock className=\"h-3 w-3\" />\r\n                  <span>Secure SSL encrypted payment</span>\r\n                </div>\r\n              </Card>\r\n            </div>\r\n          </div>\r\n        </div>\r\n      </div>\r\n\r\n      {/* Footer */}\r\n      <footer className=\"border-t bg-card py-12 mt-16\">\r\n        <div className=\"container mx-auto px-4\">\r\n          <div className=\"flex flex-col md:flex-row items-center justify-between gap-4\">\r\n            <div className=\"flex items-center gap-2\">\r\n              <Image src=\"/images/image.png\" alt=\"CCB Logo\" width={32} height={32} />\r\n              <div className=\"flex flex-col\">\r\n                <span className=\"font-serif text-lg font-bold text-primary\">CCB</span>\r\n                <span className=\"text-xs text-muted-foreground\">Est. 1881</span>\r\n              </div>\r\n            </div>\r\n            <p className=\"text-sm text-muted-foreground\">© 2025 Connecticut Clothing Brand. All rights reserved.</p>\r\n          </div>\r\n        </div>\r\n      </footer>\r\n    </div>\r\n  )\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/frontend-react/app/checkout/page.tsx b/frontend-react/app/checkout/page.tsx
+--- a/frontend-react/app/checkout/page.tsx	(revision 48aefcffbc575c0047019e8b482f06e5ba7207c5)
++++ b/frontend-react/app/checkout/page.tsx	(date 1766259457728)
+@@ -34,18 +34,28 @@
+   const tax = subtotal * 0.0635
+   const total = subtotal + shipping + tax
+ 
+-  const handleCompleteOrder = () => {
++  const handleCompleteOrder = async () => {
++    // Validation
++    const requiredFields = ["email", "firstName", "lastName", "address", "city", "state", "zip"];
++    const emptyFields = requiredFields.filter((field) => !formData[field as keyof typeof formData]);
++
++    if (emptyFields.length > 0) {
++      alert(`Please fill in all required fields: ${emptyFields.join(", ")}`);
++      return;
++    }
+     const orderDetails = {
+       id: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
+       orderNumber: Math.floor(100000 + Math.random() * 900000),
+       customerName: `${formData.firstName} ${formData.lastName}`,
+       customerEmail: formData.email,
+       items: cartItems.map((item) => ({
++        id: item.id,
+         name: item.name,
+         quantity: item.quantity,
+         price: item.price,
+         size: item.size,
+         color: item.color,
++        image: item.image,
+       })),
+       subtotal,
+       shipping,
+@@ -56,6 +66,43 @@
+       shippingAddress: `${formData.address}${formData.apartment ? `, ${formData.apartment}` : ""}, ${formData.city}, ${formData.state} ${formData.zip}`,
+     }
+ 
++    // Backend payload
++    const payload = {
++      userId: formData.email || "guest",
++      cartItems: cartItems.reduce((acc, item) => {
++        acc[item.id] = {
++          quantity: item.quantity,
++          price: item.price,
++          name: item.name
++        };
++        return acc;
++      }, {} as Record<string, any>),
++      totalPrice: total
++    }
++
++    try {
++      const response = await fetch("http://localhost:8000/order", {
++        method: "POST",
++        headers: {
++          "Content-Type": "application/json",
++        },
++        body: JSON.stringify(payload),
++      });
++
++      if (!response.ok) {
++        console.error("Order failed:", await response.text());
++        alert("Failed to submit order to backend. Check console.");
++        // proceed anyway for demo purposes? Or stop?
++        // modifying user flow. I'll proceed so the UI still works as expected by user, but log the error.
++      } else {
++        const data = await response.json();
++        console.log("Order created:", data);
++      }
++    } catch (error) {
++      console.error("Connection error:", error);
++      alert("Could not connect to Order Service.");
++    }
++
+     // Save to session storage for receipt page
+     sessionStorage.setItem("lastOrder", JSON.stringify(orderDetails))
+ 
+@@ -89,13 +136,14 @@
+                 <h2 className="font-semibold text-xl mb-4">Contact Information</h2>
+                 <div className="space-y-4">
+                   <div>
+-                    <Label htmlFor="email">Email</Label>
++                    <Label htmlFor="email">Email <span className="text-red-500">*</span></Label>
+                     <Input
+                       id="email"
+                       type="email"
+                       placeholder="you@example.com"
+                       value={formData.email}
+                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
++                      required
+                     />
+                   </div>
+                   <div className="flex items-center gap-2">
+@@ -113,31 +161,34 @@
+                 <div className="space-y-4">
+                   <div className="grid md:grid-cols-2 gap-4">
+                     <div>
+-                      <Label htmlFor="firstName">First Name</Label>
++                      <Label htmlFor="firstName">First Name <span className="text-red-500">*</span></Label>
+                       <Input
+                         id="firstName"
+                         placeholder="John"
+                         value={formData.firstName}
+                         onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
++                        required
+                       />
+                     </div>
+                     <div>
+-                      <Label htmlFor="lastName">Last Name</Label>
++                      <Label htmlFor="lastName">Last Name <span className="text-red-500">*</span></Label>
+                       <Input
+                         id="lastName"
+                         placeholder="Doe"
+                         value={formData.lastName}
+                         onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
++                        required
+                       />
+                     </div>
+                   </div>
+                   <div>
+-                    <Label htmlFor="address">Address</Label>
++                    <Label htmlFor="address">Address <span className="text-red-500">*</span></Label>
+                     <Input
+                       id="address"
+                       placeholder="123 Main Street"
+                       value={formData.address}
+                       onChange={(e) => setFormData({ ...formData, address: e.target.value })}
++                      required
+                     />
+                   </div>
+                   <div>
+@@ -151,30 +202,33 @@
+                   </div>
+                   <div className="grid md:grid-cols-3 gap-4">
+                     <div>
+-                      <Label htmlFor="city">City</Label>
++                      <Label htmlFor="city">City <span className="text-red-500">*</span></Label>
+                       <Input
+                         id="city"
+                         placeholder="Hartford"
+                         value={formData.city}
+                         onChange={(e) => setFormData({ ...formData, city: e.target.value })}
++                        required
+                       />
+                     </div>
+                     <div>
+-                      <Label htmlFor="state">State</Label>
++                      <Label htmlFor="state">State <span className="text-red-500">*</span></Label>
+                       <Input
+                         id="state"
+                         placeholder="CT"
+                         value={formData.state}
+                         onChange={(e) => setFormData({ ...formData, state: e.target.value })}
++                        required
+                       />
+                     </div>
+                     <div>
+-                      <Label htmlFor="zip">ZIP Code</Label>
++                      <Label htmlFor="zip">ZIP Code <span className="text-red-500">*</span></Label>
+                       <Input
+                         id="zip"
+                         placeholder="06101"
+                         value={formData.zip}
+                         onChange={(e) => setFormData({ ...formData, zip: e.target.value })}
++                        required
+                       />
+                     </div>
+                   </div>
+Index: user-profile-service/utils.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/user-profile-service/utils.py b/user-profile-service/utils.py
+new file mode 100644
+--- /dev/null	(date 1766259457769)
++++ b/user-profile-service/utils.py	(date 1766259457769)
+@@ -0,0 +1,35 @@
++from passlib.context import CryptContext
++from jose import jwt, JWTError
++from datetime import datetime, timedelta
++from fastapi import Depends, HTTPException
++from fastapi.security import OAuth2PasswordBearer
++from typing import Optional
++
++# Config
++SECRET_KEY = "simple_secret_key"
++ALGORITHM = "HS256"
++
++# Password Hashing
++pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
++
++# OAuth2 Scheme
++oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
++
++def hash_password(password: str):
++    return pwd_context.hash(password)
++
++def verify_password(plain, hashed):
++    return pwd_context.verify(plain, hashed)
++
++def create_token(data: dict):
++    to_encode = data.copy()
++    expire = datetime.utcnow() + timedelta(days=1)
++    to_encode.update({"exp": expire})
++    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
++
++def get_current_user(token: str = Depends(oauth2_scheme)):
++    try:
++        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
++        return payload # Returns dict: {'sub': user_id, 'role': role}
++    except JWTError:
++        raise HTTPException(status_code=401, detail="Invalid token")
+Index: user-profile-service/requirements.txt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/user-profile-service/requirements.txt b/user-profile-service/requirements.txt
+--- a/user-profile-service/requirements.txt	(revision 48aefcffbc575c0047019e8b482f06e5ba7207c5)
++++ b/user-profile-service/requirements.txt	(date 1766259457760)
+@@ -1,0 +1,7 @@
++fastapi
++uvicorn
++firebase-admin
++pydantic
++python-jose[cryptography]
++passlib[bcrypt]
++python-multipart
+Index: user-profile-service/database.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/user-profile-service/database.py b/user-profile-service/database.py
+new file mode 100644
+--- /dev/null	(date 1766259457760)
++++ b/user-profile-service/database.py	(date 1766259457760)
+@@ -0,0 +1,19 @@
++import firebase_admin
++from firebase_admin import credentials, db
++import os
++
++# 1. Setup Firebase
++SERVICE_ACCOUNT_PATH = os.path.join(os.path.dirname(__file__), "serviceAccountKey.json")
++DATABASE_URL = "https://ccb-db-41f73-default-rtdb.firebaseio.com"
++
++if not firebase_admin._apps:
++    if os.path.exists(SERVICE_ACCOUNT_PATH):
++        cred = credentials.Certificate(SERVICE_ACCOUNT_PATH)
++        firebase_admin.initialize_app(cred, {"databaseURL": DATABASE_URL})
++        print("Firebase connected.")
++    else:
++        print("WARNING: serviceAccountKey.json missing.")
++
++def get_ref(path):
++    """Get a database reference for a specific path."""
++    return db.reference(path)
+Index: user-profile-service/app.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/user-profile-service/app.py b/user-profile-service/app.py
+--- a/user-profile-service/app.py	(revision 48aefcffbc575c0047019e8b482f06e5ba7207c5)
++++ b/user-profile-service/app.py	(date 1766259457760)
+@@ -1,0 +1,22 @@
++from fastapi import FastAPI
++from fastapi.middleware.cors import CORSMiddleware
++from routers import auth, profile
++
++app = FastAPI(title="CCB User Service")
++
++# CORS
++app.add_middleware(
++    CORSMiddleware,
++    allow_origins=["*"],
++    allow_credentials=True,
++    allow_methods=["*"],
++    allow_headers=["*"],
++)
++
++# Include Routers
++app.include_router(auth.router)
++app.include_router(profile.router)
++
++@app.get("/")
++def root():
++    return {"message": "Service Running"}
+Index: user-profile-service/models.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/user-profile-service/models.py b/user-profile-service/models.py
+new file mode 100644
+--- /dev/null	(date 1766259457760)
++++ b/user-profile-service/models.py	(date 1766259457760)
+@@ -0,0 +1,24 @@
++from pydantic import BaseModel
++from typing import Optional
++
++# Signup Models
++class UserSignup(BaseModel):
++    email: str
++    password: str
++    name: str
++    phone: Optional[str] = ""
++
++class AdminSignup(BaseModel):
++    email: str
++    password: str
++    name: str
++
++# Login
++class LoginRequest(BaseModel):
++    email: str
++    password: str
++
++# Profile
++class UpdateProfile(BaseModel):
++    name: Optional[str] = None
++    phone: Optional[str] = None
+Index: user-profile-service/routers/profile.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/user-profile-service/routers/profile.py b/user-profile-service/routers/profile.py
+new file mode 100644
+--- /dev/null	(date 1766259457760)
++++ b/user-profile-service/routers/profile.py	(date 1766259457760)
+@@ -0,0 +1,30 @@
++from fastapi import APIRouter, Depends, HTTPException
++from database import get_ref
++from models import UpdateProfile
++from utils import get_current_user
++
++router = APIRouter(prefix="/profile", tags=["Profile"])
++
++@router.get("/me")
++def get_my_profile(user: dict = Depends(get_current_user)):
++    table = "users" if user["role"] == "user" else "admins"
++    ref = get_ref(f"{table}/{user['sub']}/profile")
++    
++    profile = ref.get()
++    if not profile:
++        raise HTTPException(404, "Profile not found")
++    return profile
++
++@router.put("/me")
++def update_my_profile(update: UpdateProfile, user: dict = Depends(get_current_user)):
++    table = "users" if user["role"] == "user" else "admins"
++    ref = get_ref(f"{table}/{user['sub']}/profile")
++    
++    if not ref.get():
++        raise HTTPException(404, "Profile not found")
++
++    data = update.dict(exclude_unset=True)
++    if data:
++        ref.update(data)
++        
++    return {"message": "Updated", "updates": data}
+Index: user-profile-service/routers/auth.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/user-profile-service/routers/auth.py b/user-profile-service/routers/auth.py
+new file mode 100644
+--- /dev/null	(date 1766259457760)
++++ b/user-profile-service/routers/auth.py	(date 1766259457760)
+@@ -0,0 +1,82 @@
++from fastapi import APIRouter, HTTPException
++from database import get_ref
++from models import UserSignup, AdminSignup, LoginRequest
++from utils import hash_password, verify_password, create_token
++import uuid
++import datetime
++
++router = APIRouter(prefix="/auth", tags=["Auth"])
++
++@router.post("/signup/user")
++def signup_user(user: UserSignup):
++    users_ref = get_ref("users")
++    
++    # Check if email exists
++    all_users = users_ref.get() or {}
++    for u in all_users.values():
++        if u.get("auth", {}).get("email") == user.email:
++            raise HTTPException(400, "Email already exists")
++
++    user_id = str(uuid.uuid4())
++    new_user = {
++        "auth": {
++            "email": user.email,
++            "password": hash_password(user.password),
++            "createdAt": str(datetime.datetime.now()),
++            "lastLoginAt": ""
++        },
++        "profile": {
++            "name": user.name,
++            "phone": user.phone,
++            "role": "user",
++            "status": "active"
++        }
++    }
++    users_ref.child(user_id).set(new_user)
++    return {"message": "User registered", "user_id": user_id}
++
++@router.post("/signup/admin")
++def signup_admin(admin: AdminSignup):
++    admins_ref = get_ref("admins")
++    
++    all_admins = admins_ref.get() or {}
++    for a in all_admins.values():
++        if a.get("auth", {}).get("email") == admin.email:
++            raise HTTPException(400, "Email already exists")
++
++    admin_id = str(uuid.uuid4())
++    new_admin = {
++        "auth": {
++            "email": admin.email,
++            "password": hash_password(admin.password),
++            "createdAt": str(datetime.datetime.now()),
++            "lastLoginAt": ""
++        },
++        "profile": {
++            "name": admin.name,
++            "role": "admin",
++            "status": "active"
++        }
++    }
++    admins_ref.child(admin_id).set(new_admin)
++    return {"message": "Admin registered", "admin_id": admin_id}
++
++@router.post("/login")
++def login(creds: LoginRequest):
++    # Check Users
++    users = get_ref("users").get() or {}
++    for uid, data in users.items():
++        if data.get("auth", {}).get("email") == creds.email:
++            if verify_password(creds.password, data["auth"]["password"]):
++                token = create_token({"sub": uid, "role": "user"})
++                return {"access_token": token, "token_type": "bearer", "role": "user"}
++    
++    # Check Admins
++    admins = get_ref("admins").get() or {}
++    for aid, data in admins.items():
++        if data.get("auth", {}).get("email") == creds.email:
++            if verify_password(creds.password, data["auth"]["password"]):
++                token = create_token({"sub": aid, "role": "admin"})
++                return {"access_token": token, "token_type": "bearer", "role": "admin"}
++
++    raise HTTPException(400, "Invalid credentials")
+Index: .gitignore
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>__pycache__/\r\n*.pyc\r\nserviceAccountKey.json\r\nshared-assets/serviceAccountKey.json\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/.gitignore b/.gitignore
+--- a/.gitignore	(revision 48aefcffbc575c0047019e8b482f06e5ba7207c5)
++++ b/.gitignore	(date 1766259457722)
+@@ -2,3 +2,4 @@
+ *.pyc
+ serviceAccountKey.json
+ shared-assets/serviceAccountKey.json
++order-service/serviceAccountKey.json
+Index: frontend-react/lib/auth-context.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>\"use client\"\r\n\r\nimport type React from \"react\"\r\nimport { createContext, useContext, useState, useEffect } from \"react\"\r\nimport { useRouter } from \"next/navigation\"\r\n\r\ninterface User {\r\n  email: string\r\n  name: string\r\n  isAdmin: boolean\r\n}\r\n\r\ninterface AuthContextType {\r\n  user: User | null\r\n  login: (email: string, password: string) => Promise<boolean>\r\n  logout: () => void\r\n  isAdmin: boolean\r\n  isAuthenticated: boolean\r\n}\r\n\r\nconst AuthContext = createContext<AuthContextType | undefined>(undefined)\r\n\r\n// Admin credentials for demo\r\nconst ADMIN_EMAIL = \"admin@ccb.com\"\r\nconst ADMIN_PASSWORD = \"admin123\"\r\n\r\nexport function AuthProvider({ children }: { children: React.ReactNode }) {\r\n  const [user, setUser] = useState<User | null>(null)\r\n  const router = useRouter()\r\n\r\n  // Load user from localStorage on mount\r\n  useEffect(() => {\r\n    const savedUser = localStorage.getItem(\"ccb-user\")\r\n    if (savedUser) {\r\n      setUser(JSON.parse(savedUser))\r\n    }\r\n  }, [])\r\n\r\n  // Save user to localStorage whenever it changes\r\n  useEffect(() => {\r\n    if (user) {\r\n      localStorage.setItem(\"ccb-user\", JSON.stringify(user))\r\n    } else {\r\n      localStorage.removeItem(\"ccb-user\")\r\n    }\r\n  }, [user])\r\n\r\n  const login = async (email: string, password: string): Promise<boolean> => {\r\n    // Check if admin\r\n    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {\r\n      const adminUser = {\r\n        email: ADMIN_EMAIL,\r\n        name: \"Admin\",\r\n        isAdmin: true,\r\n      }\r\n      setUser(adminUser)\r\n      return true\r\n    }\r\n\r\n    // Regular user login (simplified for demo)\r\n    if (email && password) {\r\n      const regularUser = {\r\n        email,\r\n        name: email.split(\"@\")[0],\r\n        isAdmin: false,\r\n      }\r\n      setUser(regularUser)\r\n      return true\r\n    }\r\n\r\n    return false\r\n  }\r\n\r\n  const logout = () => {\r\n    setUser(null)\r\n    localStorage.removeItem(\"ccb-user\")\r\n    router.push(\"/\")\r\n  }\r\n\r\n  return (\r\n    <AuthContext.Provider\r\n      value={{\r\n        user,\r\n        login,\r\n        logout,\r\n        isAdmin: user?.isAdmin ?? false,\r\n        isAuthenticated: user !== null,\r\n      }}\r\n    >\r\n      {children}\r\n    </AuthContext.Provider>\r\n  )\r\n}\r\n\r\nexport function useAuth() {\r\n  const context = useContext(AuthContext)\r\n  if (!context) throw new Error(\"useAuth must be used within AuthProvider\")\r\n  return context\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/frontend-react/lib/auth-context.tsx b/frontend-react/lib/auth-context.tsx
+--- a/frontend-react/lib/auth-context.tsx	(revision 48aefcffbc575c0047019e8b482f06e5ba7207c5)
++++ b/frontend-react/lib/auth-context.tsx	(date 1766259457730)
+@@ -12,7 +12,7 @@
+ 
+ interface AuthContextType {
+   user: User | null
+-  login: (email: string, password: string) => Promise<boolean>
++  login: (email: string, password: string) => Promise<User | null>
+   logout: () => void
+   isAdmin: boolean
+   isAuthenticated: boolean
+@@ -45,35 +45,32 @@
+     }
+   }, [user])
+ 
+-  const login = async (email: string, password: string): Promise<boolean> => {
+-    // Check if admin
+-    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+-      const adminUser = {
+-        email: ADMIN_EMAIL,
+-        name: "Admin",
+-        isAdmin: true,
+-      }
+-      setUser(adminUser)
+-      return true
+-    }
++  const login = async (email: string, password: string): Promise<User | null> => {
++    try {
++      const { api } = await import("./api");
++      const data = await api.login({ email, password });
+ 
+-    // Regular user login (simplified for demo)
+-    if (email && password) {
+-      const regularUser = {
++      const profile = await api.getProfile(data.access_token);
++
++      const authUser = {
+         email,
+-        name: email.split("@")[0],
+-        isAdmin: false,
+-      }
+-      setUser(regularUser)
+-      return true
++        name: profile.name,
++        isAdmin: data.role === "admin",
++      };
++
++      setUser(authUser);
++      localStorage.setItem("ccb-token", data.access_token);
++      return authUser;
++    } catch (error) {
++      console.error("Login failed:", error);
++      return null;
+     }
+-
+-    return false
+   }
+ 
+   const logout = () => {
+     setUser(null)
+     localStorage.removeItem("ccb-user")
++    localStorage.removeItem("ccb-token")
+     router.push("/")
+   }
+ 
+Index: frontend-react/app/cart/page.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>\"use client\"\r\n\r\nimport Link from \"next/link\"\r\nimport { Header } from \"@/components/header\"\r\nimport { Button } from \"@/components/ui/button\"\r\nimport { Card } from \"@/components/ui/card\"\r\nimport { Separator } from \"@/components/ui/separator\"\r\nimport { Minus, Plus, Trash2, ShoppingBag } from \"lucide-react\"\r\nimport Image from \"next/image\"\r\nimport { useStore } from \"@/lib/store-context\"\r\n\r\nexport default function CartPage() {\r\n  const { cart, removeFromCart, updateQuantity } = useStore()\r\n  const cartItems = cart\r\n\r\n  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)\r\n  const shipping = subtotal > 100 ? 0 : 15\r\n  const tax = subtotal * 0.0635\r\n  const total = subtotal + shipping + tax\r\n\r\n  return (\r\n    <div className=\"min-h-screen bg-background\">\r\n      <Header />\r\n\r\n      <div className=\"container mx-auto px-4 py-8\">\r\n        <h1 className=\"font-serif text-3xl md:text-4xl font-bold mb-8\">Shopping Cart</h1>\r\n\r\n        {cartItems.length === 0 ? (\r\n          <Card className=\"p-12 text-center\">\r\n            <ShoppingBag className=\"h-16 w-16 mx-auto text-muted-foreground mb-4\" />\r\n            <h2 className=\"font-serif text-2xl font-semibold mb-2\">Your cart is empty</h2>\r\n            <p className=\"text-muted-foreground mb-6\">Add some items to get started</p>\r\n            <Button asChild>\r\n              <Link href=\"/shop\">Continue Shopping</Link>\r\n            </Button>\r\n          </Card>\r\n        ) : (\r\n          <div className=\"grid lg:grid-cols-3 gap-8\">\r\n            {/* Cart Items */}\r\n            <div className=\"lg:col-span-2 space-y-4\">\r\n              {cartItems.map((item) => (\r\n                <Card key={`${item.id}-${item.size}-${item.color}`} className=\"p-4\">\r\n                  <div className=\"flex gap-4\">\r\n                    <div className=\"relative w-24 h-24 bg-muted rounded-md overflow-hidden flex-shrink-0\">\r\n                      <Image src={item.image || \"/placeholder.svg\"} alt={item.name} fill className=\"object-cover\" />\r\n                    </div>\r\n                    <div className=\"flex-1 min-w-0\">\r\n                      <h3 className=\"font-semibold text-lg mb-1\">{item.name}</h3>\r\n                      <p className=\"text-sm text-muted-foreground mb-2\">\r\n                        {item.color} • Size {item.size}\r\n                      </p>\r\n                      <p className=\"font-semibold text-lg\">${item.price.toFixed(2)}</p>\r\n                    </div>\r\n                    <div className=\"flex flex-col items-end gap-4\">\r\n                      <Button variant=\"ghost\" size=\"icon\" onClick={() => removeFromCart(item.id)} className=\"h-8 w-8\">\r\n                        <Trash2 className=\"h-4 w-4\" />\r\n                      </Button>\r\n                      <div className=\"flex items-center gap-2\">\r\n                        <Button\r\n                          variant=\"outline\"\r\n                          size=\"icon\"\r\n                          onClick={() => updateQuantity(item.id, -1)}\r\n                          className=\"h-8 w-8\"\r\n                        >\r\n                          <Minus className=\"h-3 w-3\" />\r\n                        </Button>\r\n                        <span className=\"w-8 text-center font-medium\">{item.quantity}</span>\r\n                        <Button\r\n                          variant=\"outline\"\r\n                          size=\"icon\"\r\n                          onClick={() => updateQuantity(item.id, 1)}\r\n                          className=\"h-8 w-8\"\r\n                        >\r\n                          <Plus className=\"h-3 w-3\" />\r\n                        </Button>\r\n                      </div>\r\n                    </div>\r\n                  </div>\r\n                </Card>\r\n              ))}\r\n            </div>\r\n\r\n            {/* Order Summary */}\r\n            <div className=\"lg:col-span-1\">\r\n              <Card className=\"p-6 sticky top-20\">\r\n                <h2 className=\"font-serif text-xl font-semibold mb-4\">Order Summary</h2>\r\n                <div className=\"space-y-3 mb-4\">\r\n                  <div className=\"flex justify-between text-sm\">\r\n                    <span className=\"text-muted-foreground\">Subtotal</span>\r\n                    <span className=\"font-medium\">${subtotal.toFixed(2)}</span>\r\n                  </div>\r\n                  <div className=\"flex justify-between text-sm\">\r\n                    <span className=\"text-muted-foreground\">Shipping</span>\r\n                    <span className=\"font-medium\">{shipping === 0 ? \"Free\" : `$${shipping.toFixed(2)}`}</span>\r\n                  </div>\r\n                  <div className=\"flex justify-between text-sm\">\r\n                    <span className=\"text-muted-foreground\">Tax (CT 6.35%)</span>\r\n                    <span className=\"font-medium\">${tax.toFixed(2)}</span>\r\n                  </div>\r\n                  <Separator />\r\n                  <div className=\"flex justify-between text-lg font-semibold\">\r\n                    <span>Total</span>\r\n                    <span>${total.toFixed(2)}</span>\r\n                  </div>\r\n                </div>\r\n                {shipping > 0 && (\r\n                  <p className=\"text-xs text-muted-foreground mb-4 p-3 bg-secondary/50 rounded-md\">\r\n                    Add ${(100 - subtotal).toFixed(2)} more for free shipping\r\n                  </p>\r\n                )}\r\n                <Button asChild className=\"w-full mb-3\" size=\"lg\">\r\n                  <Link href=\"/checkout\">Proceed to Checkout</Link>\r\n                </Button>\r\n                <Button asChild variant=\"outline\" className=\"w-full bg-transparent\">\r\n                  <Link href=\"/shop\">Continue Shopping</Link>\r\n                </Button>\r\n              </Card>\r\n            </div>\r\n          </div>\r\n        )}\r\n      </div>\r\n\r\n      {/* Footer */}\r\n      <footer className=\"border-t bg-card py-12 mt-16\">\r\n        <div className=\"container mx-auto px-4\">\r\n          <div className=\"flex flex-col md:flex-row items-center justify-between gap-4\">\r\n            <div className=\"flex items-center gap-2\">\r\n              <Image src=\"/images/image.png\" alt=\"CCB Logo\" width={32} height={32} />\r\n              <div className=\"flex flex-col\">\r\n                <span className=\"font-serif text-lg font-bold text-primary\">CCB</span>\r\n                <span className=\"text-xs text-muted-foreground\">Est. 1881</span>\r\n              </div>\r\n            </div>\r\n            <p className=\"text-sm text-muted-foreground\">© 2025 Connecticut Clothing Brand. All rights reserved.</p>\r\n          </div>\r\n        </div>\r\n      </footer>\r\n    </div>\r\n  )\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/frontend-react/app/cart/page.tsx b/frontend-react/app/cart/page.tsx
+--- a/frontend-react/app/cart/page.tsx	(revision 48aefcffbc575c0047019e8b482f06e5ba7207c5)
++++ b/frontend-react/app/cart/page.tsx	(date 1766259457725)
+@@ -13,6 +13,8 @@
+   const { cart, removeFromCart, updateQuantity } = useStore()
+   const cartItems = cart
+ 
++  // Inside your Cart or Checkout component
++
+   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+   const shipping = subtotal > 100 ? 0 : 15
+   const tax = subtotal * 0.0635
+@@ -111,9 +113,7 @@
+                 <Button asChild className="w-full mb-3" size="lg">
+                   <Link href="/checkout">Proceed to Checkout</Link>
+                 </Button>
+-                <Button asChild variant="outline" className="w-full bg-transparent">
+-                  <Link href="/shop">Continue Shopping</Link>
+-                </Button>
++
+               </Card>
+             </div>
+           </div>
+Index: order-service/requirements.txt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/order-service/requirements.txt b/order-service/requirements.txt
+--- a/order-service/requirements.txt	(revision 48aefcffbc575c0047019e8b482f06e5ba7207c5)
++++ b/order-service/requirements.txt	(date 1766259457754)
+@@ -1,0 +1,4 @@
++fastapi
++uvicorn
++kafka-python
++firebase-admin
+\ No newline at end of file
+Index: frontend-react/components/auth/signup-form.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>\"use client\"\r\n\r\nimport type React from \"react\"\r\n\r\nimport { useState } from \"react\"\r\nimport { useRouter } from \"next/navigation\"\r\nimport { Button } from \"@/components/ui/button\"\r\nimport { Input } from \"@/components/ui/input\"\r\nimport { Label } from \"@/components/ui/label\"\r\nimport { Checkbox } from \"@/components/ui/checkbox\"\r\nimport { Loader2 } from \"lucide-react\"\r\n\r\nexport function SignupForm() {\r\n  const router = useRouter()\r\n  const [isLoading, setIsLoading] = useState(false)\r\n  const [formData, setFormData] = useState({\r\n    name: \"\",\r\n    email: \"\",\r\n    password: \"\",\r\n    confirmPassword: \"\",\r\n    acceptTerms: false,\r\n  })\r\n\r\n  const handleSubmit = async (e: React.FormEvent) => {\r\n    e.preventDefault()\r\n\r\n    if (formData.password !== formData.confirmPassword) {\r\n      alert(\"Passwords do not match\")\r\n      return\r\n    }\r\n\r\n    if (!formData.acceptTerms) {\r\n      alert(\"Please accept the terms and conditions\")\r\n      return\r\n    }\r\n\r\n    setIsLoading(true)\r\n\r\n    // Simulate API call\r\n    await new Promise((resolve) => setTimeout(resolve, 1500))\r\n\r\n    // In a real app, you would handle registration here\r\n    console.log(\"[v0] Signup attempt:\", formData)\r\n\r\n    setIsLoading(false)\r\n    router.push(\"/profile\")\r\n  }\r\n\r\n  return (\r\n    <form onSubmit={handleSubmit} className=\"space-y-6\">\r\n      <div className=\"space-y-4\">\r\n        <div className=\"space-y-2\">\r\n          <Label htmlFor=\"name\">Full Name</Label>\r\n          <Input\r\n            id=\"name\"\r\n            type=\"text\"\r\n            placeholder=\"John Doe\"\r\n            required\r\n            value={formData.name}\r\n            onChange={(e) => setFormData({ ...formData, name: e.target.value })}\r\n          />\r\n        </div>\r\n\r\n        <div className=\"space-y-2\">\r\n          <Label htmlFor=\"email\">Email</Label>\r\n          <Input\r\n            id=\"email\"\r\n            type=\"email\"\r\n            placeholder=\"you@example.com\"\r\n            required\r\n            value={formData.email}\r\n            onChange={(e) => setFormData({ ...formData, email: e.target.value })}\r\n          />\r\n        </div>\r\n\r\n        <div className=\"space-y-2\">\r\n          <Label htmlFor=\"password\">Password</Label>\r\n          <Input\r\n            id=\"password\"\r\n            type=\"password\"\r\n            placeholder=\"••••••••\"\r\n            required\r\n            minLength={8}\r\n            value={formData.password}\r\n            onChange={(e) => setFormData({ ...formData, password: e.target.value })}\r\n          />\r\n          <p className=\"text-xs text-muted-foreground\">Must be at least 8 characters</p>\r\n        </div>\r\n\r\n        <div className=\"space-y-2\">\r\n          <Label htmlFor=\"confirmPassword\">Confirm Password</Label>\r\n          <Input\r\n            id=\"confirmPassword\"\r\n            type=\"password\"\r\n            placeholder=\"••••••••\"\r\n            required\r\n            value={formData.confirmPassword}\r\n            onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}\r\n          />\r\n        </div>\r\n\r\n        <div className=\"flex items-start space-x-2\">\r\n          <Checkbox\r\n            id=\"terms\"\r\n            checked={formData.acceptTerms}\r\n            onCheckedChange={(checked) => setFormData({ ...formData, acceptTerms: checked as boolean })}\r\n          />\r\n          <Label htmlFor=\"terms\" className=\"text-sm font-normal leading-relaxed cursor-pointer\">\r\n            I agree to the{\" \"}\r\n            <a href=\"#\" className=\"text-primary hover:underline\">\r\n              Terms of Service\r\n            </a>{\" \"}\r\n            and{\" \"}\r\n            <a href=\"#\" className=\"text-primary hover:underline\">\r\n              Privacy Policy\r\n            </a>\r\n          </Label>\r\n        </div>\r\n      </div>\r\n\r\n      <Button type=\"submit\" className=\"w-full\" disabled={isLoading}>\r\n        {isLoading ? (\r\n          <>\r\n            <Loader2 className=\"mr-2 h-4 w-4 animate-spin\" />\r\n            Creating account...\r\n          </>\r\n        ) : (\r\n          \"Create Account\"\r\n        )}\r\n      </Button>\r\n\r\n      <div className=\"relative\">\r\n        <div className=\"absolute inset-0 flex items-center\">\r\n          <span className=\"w-full border-t\" />\r\n        </div>\r\n        <div className=\"relative flex justify-center text-xs uppercase\">\r\n          <span className=\"bg-background px-2 text-muted-foreground\">Or continue with</span>\r\n        </div>\r\n      </div>\r\n\r\n      <div className=\"grid grid-cols-2 gap-4\">\r\n        <Button variant=\"outline\" type=\"button\">\r\n          <svg className=\"mr-2 h-4 w-4\" viewBox=\"0 0 24 24\">\r\n            <path\r\n              fill=\"currentColor\"\r\n              d=\"M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z\"\r\n            />\r\n            <path\r\n              fill=\"currentColor\"\r\n              d=\"M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z\"\r\n            />\r\n            <path\r\n              fill=\"currentColor\"\r\n              d=\"M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z\"\r\n            />\r\n            <path\r\n              fill=\"currentColor\"\r\n              d=\"M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z\"\r\n            />\r\n          </svg>\r\n          Google\r\n        </Button>\r\n        <Button variant=\"outline\" type=\"button\">\r\n          <svg className=\"mr-2 h-4 w-4\" fill=\"currentColor\" viewBox=\"0 0 24 24\">\r\n            <path d=\"M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z\" />\r\n          </svg>\r\n          GitHub\r\n        </Button>\r\n      </div>\r\n    </form>\r\n  )\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/frontend-react/components/auth/signup-form.tsx b/frontend-react/components/auth/signup-form.tsx
+--- a/frontend-react/components/auth/signup-form.tsx	(revision 48aefcffbc575c0047019e8b482f06e5ba7207c5)
++++ b/frontend-react/components/auth/signup-form.tsx	(date 1766259457730)
+@@ -36,14 +36,22 @@
+ 
+     setIsLoading(true)
+ 
+-    // Simulate API call
+-    await new Promise((resolve) => setTimeout(resolve, 1500))
++    try {
++      // Dynamic import to avoid top-level dependency issues until installed
++      const { api } = await import("@/lib/api");
+ 
+-    // In a real app, you would handle registration here
+-    console.log("[v0] Signup attempt:", formData)
++      await api.signup("user", {
++        email: formData.email,
++        password: formData.password,
++        name: formData.name,
++      });
+ 
+-    setIsLoading(false)
+-    router.push("/profile")
++      setIsLoading(false);
++      router.push("/login");
++    } catch (error: any) {
++      setIsLoading(false);
++      alert(error.message || "Signup failed");
++    }
+   }
+ 
+   return (
+Index: frontend-react/components/auth/login-form.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>\"use client\"\r\n\r\nimport type React from \"react\"\r\nimport { useState } from \"react\"\r\nimport { useRouter } from \"next/navigation\"\r\nimport { useAuth } from \"@/lib/auth-context\"\r\nimport { Button } from \"@/components/ui/button\"\r\nimport { Input } from \"@/components/ui/input\"\r\nimport { Label } from \"@/components/ui/label\"\r\nimport { Checkbox } from \"@/components/ui/checkbox\"\r\nimport { Loader2 } from \"lucide-react\"\r\n\r\nexport function LoginForm() {\r\n  const router = useRouter()\r\n  const { login } = useAuth()\r\n  const [isLoading, setIsLoading] = useState(false)\r\n  const [error, setError] = useState(\"\")\r\n  const [formData, setFormData] = useState({\r\n    email: \"\",\r\n    password: \"\",\r\n    rememberMe: false,\r\n  })\r\n\r\n  const handleSubmit = async (e: React.FormEvent) => {\r\n    e.preventDefault()\r\n    setIsLoading(true)\r\n    setError(\"\")\r\n\r\n    const success = await login(formData.email, formData.password)\r\n\r\n    setIsLoading(false)\r\n\r\n    if (success) {\r\n      if (formData.email === \"admin@ccb.com\") {\r\n        router.push(\"/admin\")\r\n      } else {\r\n        router.push(\"/profile\")\r\n      }\r\n    } else {\r\n      setError(\"Invalid email or password\")\r\n    }\r\n  }\r\n\r\n  return (\r\n    <form onSubmit={handleSubmit} className=\"space-y-6\">\r\n      {error && (\r\n        <div className=\"bg-destructive/10 text-destructive text-sm p-3 rounded-md border border-destructive/20\">\r\n          {error}\r\n        </div>\r\n      )}\r\n\r\n      <div className=\"space-y-4\">\r\n        <div className=\"space-y-2\">\r\n          <Label htmlFor=\"email\">Email</Label>\r\n          <Input\r\n            id=\"email\"\r\n            type=\"email\"\r\n            placeholder=\"you@example.com\"\r\n            required\r\n            value={formData.email}\r\n            onChange={(e) => setFormData({ ...formData, email: e.target.value })}\r\n          />\r\n          <p className=\"text-xs text-muted-foreground\">Admin: admin@ccb.com / admin123</p>\r\n        </div>\r\n\r\n        <div className=\"space-y-2\">\r\n          <div className=\"flex items-center justify-between\">\r\n            <Label htmlFor=\"password\">Password</Label>\r\n            <Button variant=\"link\" className=\"px-0 h-auto text-sm\" asChild>\r\n              <a href=\"#\">Forgot password?</a>\r\n            </Button>\r\n          </div>\r\n          <Input\r\n            id=\"password\"\r\n            type=\"password\"\r\n            placeholder=\"••••••••\"\r\n            required\r\n            value={formData.password}\r\n            onChange={(e) => setFormData({ ...formData, password: e.target.value })}\r\n          />\r\n        </div>\r\n\r\n        <div className=\"flex items-center space-x-2\">\r\n          <Checkbox\r\n            id=\"remember\"\r\n            checked={formData.rememberMe}\r\n            onCheckedChange={(checked) => setFormData({ ...formData, rememberMe: checked as boolean })}\r\n          />\r\n          <Label htmlFor=\"remember\" className=\"text-sm font-normal cursor-pointer\">\r\n            Remember me for 30 days\r\n          </Label>\r\n        </div>\r\n      </div>\r\n\r\n      <Button type=\"submit\" className=\"w-full\" disabled={isLoading}>\r\n        {isLoading ? (\r\n          <>\r\n            <Loader2 className=\"mr-2 h-4 w-4 animate-spin\" />\r\n            Signing in...\r\n          </>\r\n        ) : (\r\n          \"Sign In\"\r\n        )}\r\n      </Button>\r\n\r\n      <div className=\"relative\">\r\n        <div className=\"absolute inset-0 flex items-center\">\r\n          <span className=\"w-full border-t\" />\r\n        </div>\r\n        <div className=\"relative flex justify-center text-xs uppercase\">\r\n          <span className=\"bg-background px-2 text-muted-foreground\">Or continue with</span>\r\n        </div>\r\n      </div>\r\n\r\n      <div className=\"grid grid-cols-2 gap-4\">\r\n        <Button variant=\"outline\" type=\"button\">\r\n          <svg className=\"mr-2 h-4 w-4\" viewBox=\"0 0 24 24\">\r\n            <path\r\n              fill=\"currentColor\"\r\n              d=\"M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z\"\r\n            />\r\n            <path\r\n              fill=\"currentColor\"\r\n              d=\"M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z\"\r\n            />\r\n            <path\r\n              fill=\"currentColor\"\r\n              d=\"M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z\"\r\n            />\r\n            <path\r\n              fill=\"currentColor\"\r\n              d=\"M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z\"\r\n            />\r\n          </svg>\r\n          Google\r\n        </Button>\r\n        <Button variant=\"outline\" type=\"button\">\r\n          <svg className=\"mr-2 h-4 w-4\" fill=\"currentColor\" viewBox=\"0 0 24 24\">\r\n            <path d=\"M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.17 6.839 9.49.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.463-1.11-1.463-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.167 22 16.418 22 12c0-5.523-4.477-10-10-10z\" />\r\n          </svg>\r\n          GitHub\r\n        </Button>\r\n      </div>\r\n    </form>\r\n  )\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/frontend-react/components/auth/login-form.tsx b/frontend-react/components/auth/login-form.tsx
+--- a/frontend-react/components/auth/login-form.tsx	(revision 48aefcffbc575c0047019e8b482f06e5ba7207c5)
++++ b/frontend-react/components/auth/login-form.tsx	(date 1766259457730)
+@@ -26,12 +26,12 @@
+     setIsLoading(true)
+     setError("")
+ 
+-    const success = await login(formData.email, formData.password)
++    const user = await login(formData.email, formData.password)
+ 
+     setIsLoading(false)
+ 
+-    if (success) {
+-      if (formData.email === "admin@ccb.com") {
++    if (user) {
++      if (user.isAdmin) {
+         router.push("/admin")
+       } else {
+         router.push("/profile")
+diff --git a/winget b/winget
+new file mode 100644
+diff --git a/python b/python
+new file mode 100644
