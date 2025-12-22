@@ -13,7 +13,7 @@ export default function HeritageCollectionPage() {
 
   // Fetch products from API
   useEffect(() => {
-    fetch('http://localhost:8001/products')
+    fetch('/api/products')
       .then((res) => res.json())
       .then((data) => {
         setProducts(Array.isArray(data) ? data : [])

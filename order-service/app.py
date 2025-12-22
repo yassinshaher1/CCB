@@ -1,14 +1,9 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from datetime import datetime
-import sys, os
 from fastapi.middleware.cors import CORSMiddleware
 
-# Add shared-assets to path specially because it has a hyphen
-shared_assets_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "shared-assets")
-sys.path.insert(0, shared_assets_path)
-
-# noinspection PyUnresolvedReferences
+# Local firebase config (no longer depends on shared-assets)
 from firebase_config import get_db
 
 app = FastAPI()

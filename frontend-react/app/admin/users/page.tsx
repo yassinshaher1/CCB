@@ -25,7 +25,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 
-const API_URL = "http://localhost:8000"
+const API_URL = "/api"
 
 interface User {
     id: string

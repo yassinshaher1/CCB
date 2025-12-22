@@ -1,4 +1,5 @@
 import json
+import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -7,11 +8,20 @@ import firebase_admin
 from firebase_admin import credentials, db
 
 # --- CONFIGURATION ---
-CRED_PATH = "serviceAccountKey.json"
+# Check K8s mounted path first, then fall back to local file
+CRED_PATH = os.environ.get(
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "/app/serviceAccountKey.json"  # K8s mounted path
+)
+if not os.path.exists(CRED_PATH):
+    CRED_PATH = "serviceAccountKey.json"  # Local fallback
+
 DATABASE_URL = "https://ccb-db-41f73-default-rtdb.firebaseio.com/"
 
 # --- FIREBASE SETUP ---
 if not firebase_admin._apps:
+    if not os.path.exists(CRED_PATH):
+        raise RuntimeError(f"FATAL: serviceAccountKey.json not found at {CRED_PATH}")
     cred = credentials.Certificate(CRED_PATH)
     firebase_admin.initialize_app(cred, {
         'databaseURL': DATABASE_URL

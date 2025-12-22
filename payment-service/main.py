@@ -1,15 +1,8 @@
 import time
 import threading
 from datetime import datetime
-import sys, os
 
-# Add shared-assets to path
-shared_assets_path = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "shared-assets"
-)
-sys.path.append(shared_assets_path)
-
+# Local firebase config (no longer depends on shared-assets)
 from firebase_config import get_db
 
 # Get Realtime Database root reference

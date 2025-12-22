@@ -19,7 +19,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
-const API_URL = "http://localhost:8001"
+const API_URL = "/api"
 
 interface Product {
   id: string

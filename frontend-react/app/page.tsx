@@ -42,7 +42,7 @@ export default function HomePage() {
   // --- FETCH PRODUCTS ---
   const fetchProducts = () => {
     setLoading(true);
-    fetch('http://localhost:8001/products')
+    fetch('/api/products')
       .then((res) => res.json())
       .then((data) => {
         setProducts(Array.isArray(data) ? data : []);
@@ -94,7 +94,7 @@ export default function HomePage() {
       categoryId: newProduct.categoryId
     };
 
-    await fetch('http://localhost:8001/products', {
+    await fetch('/api/products', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(productData)
@@ -106,7 +106,7 @@ export default function HomePage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this?")) return;
-    await fetch(`http://localhost:8001/products/${id}`, { method: 'DELETE' });
+    await fetch(`/api/products/${id}`, { method: 'DELETE' });
     fetchProducts();
   };
 
@@ -128,7 +128,7 @@ export default function HomePage() {
       imageUrl: newImage
     };
 
-    await fetch(`http://localhost:8001/products/${product.id}`, {
+    await fetch(`/api/products/${product.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatedProduct)

@@ -1,4 +1,6 @@
-const BASE_URL = "http://localhost:8000";
+// API calls go through Next.js rewrites (see next.config.mjs)
+// This allows the frontend server to proxy to internal K8s services
+const BASE_URL = "/api";
 
 export const api = {
     async signup(type: 'user' | 'admin', data: any) {

@@ -116,7 +116,7 @@ export default function CheckoutPage() {
     }
 
     try {
-      const response = await fetch("http://localhost:8002/order", {
+      const response = await fetch("/api/order", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
