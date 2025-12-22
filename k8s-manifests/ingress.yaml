@@ -1,0 +1,46 @@
+# CCB Ingress Configuration
+# Routes traffic from NGINX Ingress Controller to backend services
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ccb-ingress
+  namespace: ccb-dev
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      # API Routes
+      - path: /api/catalog(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: catalog-service
+            port:
+              number: 80
+      - path: /api/order(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: order-service
+            port:
+              number: 80
+      - path: /api/user(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: user-profile-service
+            port:
+              number: 80
+      # Frontend - catch all other routes
+      - path: /(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 80

@@ -1,0 +1,312 @@
+# CCB Microservices Deployments
+# All services deploy to ccb-dev namespace
+# Resource limits kept minimal for 2GB RAM server
+# Ports aligned with local development (README.md)
+---
+# =============================================================================
+# USER PROFILE SERVICE (Auth) - Port 8000
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-profile-service
+  namespace: ccb-dev
+  labels:
+    app: user-profile-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-profile-service
+  template:
+    metadata:
+      labels:
+        app: user-profile-service
+    spec:
+      containers:
+      - name: user-profile-service
+        image: yassinshaher/ccb-user:latest
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: firebase-key
+          mountPath: /app/serviceAccountKey.json
+          subPath: serviceAccountKey.json
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: firebase-key
+        secret:
+          secretName: firebase-key
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-profile-service
+  namespace: ccb-dev
+spec:
+  selector:
+    app: user-profile-service
+  ports:
+  - port: 80
+    targetPort: 8000
+  type: ClusterIP
+---
+# =============================================================================
+# CATALOG SERVICE - Port 8001
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-service
+  namespace: ccb-dev
+  labels:
+    app: catalog-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: catalog-service
+  template:
+    metadata:
+      labels:
+        app: catalog-service
+    spec:
+      containers:
+      - name: catalog-service
+        image: yassinshaher/ccb-catalog:latest
+        ports:
+        - containerPort: 8001
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: firebase-key
+          mountPath: /app/serviceAccountKey.json
+          subPath: serviceAccountKey.json
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /products
+            port: 8001
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /products
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: firebase-key
+        secret:
+          secretName: firebase-key
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-service
+  namespace: ccb-dev
+spec:
+  selector:
+    app: catalog-service
+  ports:
+  - port: 80
+    targetPort: 8001
+  type: ClusterIP
+---
+# =============================================================================
+# ORDER SERVICE - Port 8002
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  namespace: ccb-dev
+  labels:
+    app: order-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+    spec:
+      containers:
+      - name: order-service
+        image: yassinshaher/ccb-order:latest
+        ports:
+        - containerPort: 8002
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: firebase-key
+          mountPath: /app/serviceAccountKey.json
+          subPath: serviceAccountKey.json
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /order
+            port: 8002
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /order
+            port: 8002
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: firebase-key
+        secret:
+          secretName: firebase-key
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+  namespace: ccb-dev
+spec:
+  selector:
+    app: order-service
+  ports:
+  - port: 80
+    targetPort: 8002
+  type: ClusterIP
+---
+# =============================================================================
+# PAYMENT SERVICE (Event Listener - No HTTP, Background Worker)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service
+  namespace: ccb-dev
+  labels:
+    app: payment-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+    spec:
+      containers:
+      - name: payment-service
+        image: yassinshaher/ccb-payment:latest
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: firebase-key
+          mountPath: /app/serviceAccountKey.json
+          subPath: serviceAccountKey.json
+          readOnly: true
+      volumes:
+      - name: firebase-key
+        secret:
+          secretName: firebase-key
+      restartPolicy: Always
+# Note: No Service for payment-service - it's a background worker listening to Firebase
+---
+# =============================================================================
+# FRONTEND (Next.js) - Port 3000
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: ccb-dev
+  labels:
+    app: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: yassinshaher/ccb-frontend:latest
+        ports:
+        - containerPort: 3000
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "300m"
+        env:
+        - name: NEXT_PUBLIC_API_URL
+          value: "http://user-profile-service"
+        - name: NEXT_PUBLIC_CATALOG_URL
+          value: "http://catalog-service"
+        - name: NEXT_PUBLIC_ORDER_URL
+          value: "http://order-service"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: ccb-dev
+spec:
+  selector:
+    app: frontend
+  ports:
+  - port: 80
+    targetPort: 3000
+  type: ClusterIP
