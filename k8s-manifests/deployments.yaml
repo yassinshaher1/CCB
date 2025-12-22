@@ -1,10 +1,10 @@
-# CCB Microservices Deployments
-# All services deploy to ccb-dev namespace
-# Resource limits kept minimal for 2GB RAM server
-# Ports aligned with local development (README.md)
+# CCB Microservices - K3s Optimized (1.5GB RAM Server)
+# - NodePort for external access (no Traefik)
+# - Recreate strategy (saves RAM)
+# - Memory limits on all containers
 ---
 # =============================================================================
-# USER PROFILE SERVICE (Auth) - Port 8000
+# USER PROFILE SERVICE - Port 8000
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
@@ -15,6 +15,8 @@ metadata:
     app: user-profile-service
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: user-profile-service
@@ -31,27 +33,15 @@ spec:
         resources:
           requests:
             memory: "64Mi"
-            cpu: "50m"
+            cpu: "25m"
           limits:
             memory: "128Mi"
-            cpu: "200m"
+            cpu: "150m"
         volumeMounts:
         - name: firebase-key
           mountPath: /app/serviceAccountKey.json
           subPath: serviceAccountKey.json
           readOnly: true
-        livenessProbe:
-          httpGet:
-            path: /
-            port: 8000
-          initialDelaySeconds: 15
-          periodSeconds: 20
-        readinessProbe:
-          httpGet:
-            path: /
-            port: 8000
-          initialDelaySeconds: 5
-          periodSeconds: 10
       volumes:
       - name: firebase-key
         secret:
@@ -63,12 +53,13 @@ metadata:
   name: user-profile-service
   namespace: ccb-dev
 spec:
+  type: NodePort
   selector:
     app: user-profile-service
   ports:
   - port: 80
     targetPort: 8000
-  type: ClusterIP
+    nodePort: 30000
 ---
 # =============================================================================
 # CATALOG SERVICE - Port 8001
@@ -82,6 +73,8 @@ metadata:
     app: catalog-service
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: catalog-service
@@ -98,27 +91,15 @@ spec:
         resources:
           requests:
             memory: "64Mi"
-            cpu: "50m"
+            cpu: "25m"
           limits:
             memory: "128Mi"
-            cpu: "200m"
+            cpu: "150m"
         volumeMounts:
         - name: firebase-key
           mountPath: /app/serviceAccountKey.json
           subPath: serviceAccountKey.json
           readOnly: true
-        livenessProbe:
-          httpGet:
-            path: /products
-            port: 8001
-          initialDelaySeconds: 15
-          periodSeconds: 20
-        readinessProbe:
-          httpGet:
-            path: /products
-            port: 8001
-          initialDelaySeconds: 5
-          periodSeconds: 10
       volumes:
       - name: firebase-key
         secret:
@@ -130,12 +111,13 @@ metadata:
   name: catalog-service
   namespace: ccb-dev
 spec:
+  type: NodePort
   selector:
     app: catalog-service
   ports:
   - port: 80
     targetPort: 8001
-  type: ClusterIP
+    nodePort: 30001
 ---
 # =============================================================================
 # ORDER SERVICE - Port 8002
@@ -149,6 +131,8 @@ metadata:
     app: order-service
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: order-service
@@ -165,27 +149,15 @@ spec:
         resources:
           requests:
             memory: "64Mi"
-            cpu: "50m"
+            cpu: "25m"
           limits:
             memory: "128Mi"
-            cpu: "200m"
+            cpu: "150m"
         volumeMounts:
         - name: firebase-key
           mountPath: /app/serviceAccountKey.json
           subPath: serviceAccountKey.json
           readOnly: true
-        livenessProbe:
-          httpGet:
-            path: /order
-            port: 8002
-          initialDelaySeconds: 15
-          periodSeconds: 20
-        readinessProbe:
-          httpGet:
-            path: /order
-            port: 8002
-          initialDelaySeconds: 5
-          periodSeconds: 10
       volumes:
       - name: firebase-key
         secret:
@@ -197,15 +169,16 @@ metadata:
   name: order-service
   namespace: ccb-dev
 spec:
+  type: NodePort
   selector:
     app: order-service
   ports:
   - port: 80
     targetPort: 8002
-  type: ClusterIP
+    nodePort: 30002
 ---
 # =============================================================================
-# PAYMENT SERVICE (Event Listener - No HTTP, Background Worker)
+# PAYMENT SERVICE (Background Worker - No HTTP)
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
@@ -216,6 +189,8 @@ metadata:
     app: payment-service
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: payment-service
@@ -230,10 +205,10 @@ spec:
         resources:
           requests:
             memory: "64Mi"
-            cpu: "50m"
+            cpu: "25m"
           limits:
             memory: "128Mi"
-            cpu: "200m"
+            cpu: "150m"
         volumeMounts:
         - name: firebase-key
           mountPath: /app/serviceAccountKey.json
@@ -244,7 +219,6 @@ spec:
         secret:
           secretName: firebase-key
       restartPolicy: Always
-# Note: No Service for payment-service - it's a background worker listening to Firebase
 ---
 # =============================================================================
 # FRONTEND (Next.js) - Port 3000
@@ -258,6 +232,8 @@ metadata:
     app: frontend
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: frontend
@@ -274,10 +250,10 @@ spec:
         resources:
           requests:
             memory: "128Mi"
-            cpu: "100m"
+            cpu: "50m"
           limits:
             memory: "256Mi"
-            cpu: "300m"
+            cpu: "200m"
         env:
         - name: NEXT_PUBLIC_API_URL
           value: "http://user-profile-service"
@@ -285,18 +261,6 @@ spec:
           value: "http://catalog-service"
         - name: NEXT_PUBLIC_ORDER_URL
           value: "http://order-service"
-        livenessProbe:
-          httpGet:
-            path: /
-            port: 3000
-          initialDelaySeconds: 30
-          periodSeconds: 20
-        readinessProbe:
-          httpGet:
-            path: /
-            port: 3000
-          initialDelaySeconds: 10
-          periodSeconds: 10
 ---
 apiVersion: v1
 kind: Service
@@ -304,9 +268,10 @@ metadata:
   name: frontend
   namespace: ccb-dev
 spec:
+  type: NodePort
   selector:
     app: frontend
   ports:
   - port: 80
     targetPort: 3000
-  type: ClusterIP
+    nodePort: 30080
